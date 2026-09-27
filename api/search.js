@@ -31,12 +31,12 @@ function buildQueries(q){
  return [...new Set(queries)].slice(0,5);
 }
 
-function canonical(u){try{const x=new URL(u);['utm_source','utm_medium','utm_campaign','utm_term','utm_content','fbclid','gclid','mc_cid','mc_eid'].forEach(k=>x.searchParams.delete(k));x.hash='';return x.origin+x.pathname.replace(/\\/$/,'')}catch{return ''}}
+function canonical(u){try{const x=new URL(u);['utm_source','utm_medium','utm_campaign','utm_term','utm_content','fbclid','gclid','mc_cid','mc_eid'].forEach(k=>x.searchParams.delete(k));x.hash='';return x.origin+x.pathname.replace(/\/$/,'')}catch{return ''}}
 function dedupe(items){const seen=new Set();const out=[];for(const x of items){const u=canonical(x.url||'');if(!u||seen.has(u))continue;seen.add(u);out.push({...x,url:u})}return out}
-function norm(s){return String(s||'').toLowerCase().replace(/https?:\\/\\/\\S+/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim()}
+function norm(s){return String(s||'').toLowerCase().replace(/https?:\/\/\S+/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
 function tokens(s){return new Set(norm(s).split(' ').filter(x=>x.length>3))}
 function jaccard(a,b){const A=tokens(a),B=tokens(b);let inter=0;for(const x of A)if(B.has(x))inter++;const union=new Set([...A,...B]).size;return union?inter/union:0}
-function classify(url,title){const h=(url+' '+title).toLowerCase();if(/pubmed|nih\\.gov|ncbi\\.nlm|mayoclinic|hopkinsmedicine|stanford\\.edu|parkinson\\.org|movementdisorders\\.org|neuropt\\.org|apta\\.org|lbda/.test(h))return 'clinical/patient organization';if(/reddit|agingcare|forum|community|discussion|patient|caregiver/.test(h))return 'community/lived experience';return 'journalism/general web'}
+function classify(url,title){const h=(url+' '+title).toLowerCase();if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|parkinson\.org|movementdisorders\.org|neuropt\.org|apta\.org|lbda/.test(h))return 'clinical/patient organization';if(/reddit|agingcare|forum|community|discussion|patient|caregiver/.test(h))return 'community/lived experience';return 'journalism/general web'}
 
 function buildClusters(src){
  const groups=[];
