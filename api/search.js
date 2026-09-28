@@ -8,18 +8,53 @@ export default async function handler(req,res){
     if(!q) return res.status(400).json({error:"Query required"});
 
     const queries=buildQueries(q);
-    const response=await fetch("https://api.parallel.ai/v1/search",{
-      method:"POST",
-      headers:{
-        "Authorization":"Bearer "+process.env.PARALLEL_API_KEY,
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        objective:"Find high-value sources for a caregiving research question. Prioritize genuinely independent patient/caregiver lived-experience discussions and high-quality clinical or patient-organization context. Return source titles, URLs, domains, publication dates when available, and concise excerpts. Do not synthesize or diagnose.",
-        search_queries:queries,
-        advanced_settings:{max_results:40}
-      })
-    });
+    async function providerSearch(objective, search_queries, max_results){
+      const response=await fetch("https://api.parallel.ai/v1/search",{
+        method:"POST",
+        headers:{
+          "Authorization":"Bearer "+process.env.PARALLEL_API_KEY,
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          objective,
+          search_queries,
+          advanced_settings:{max_results}
+        })
+      });
+      const raw=await response.text();
+      let data;
+      try{data=JSON.parse(raw)}catch{
+        throw new Error("Research provider returned non-JSON: "+raw.slice(0,500));
+      }
+      if(!response.ok) throw new Error(data?.error?.message||data?.message||raw.slice(0,500));
+      return extractResults(data);
+    }
+
+    // Run distinct evidence searches. This is intentional: a single broad search
+    // tends to over-return clinical/SEO pages and under-return firsthand discussions.
+    const communityQueries=queries.filter(x=>/site:agingcare|site:reddit|site:myparkinsons|forum|caregiver experience|firsthand/i.test(x));
+    const clinicalQueries=queries.filter(x=>/clinical|systematic review|orthostatic|medication timing/i.test(x));
+    const generalQueries=[q+" Parkinson's caregiver patient experience rehabilitation",q+" Parkinson's physical therapy progress barriers"];
+
+    const [communityResults,clinicalResults,generalResults]=await Promise.all([
+      providerSearch(
+        "Find FIRSTHAND patient or caregiver discussions about the specific caregiving problem. Prioritize discussion threads and Q&A where an individual describes what happened, what was tried, and what the outcome was. Prefer AgingCare, Reddit Parkinson's communities, Parkinson's forums, and other patient/caregiver discussion communities. Do NOT return general medical guides, clinic marketing, or generic educational pages unless needed as a last resort.",
+        communityQueries.length?communityQueries:[q+" caregiver firsthand experience"],
+        16
+      ),
+      providerSearch(
+        "Find high-quality clinical evidence and patient-organization guidance relevant to the question. Prioritize systematic reviews, clinical practice guidelines, PubMed/NIH, major academic medical centers, Parkinson's Foundation, and Movement Disorder Society. This is the verification/context layer, not the lived-experience layer.",
+        clinicalQueries.length?clinicalQueries:[q+" clinical evidence"],
+        16
+      ),
+      providerSearch(
+        "Find useful sources for the caregiving question, with preference for independent patient/caregiver reporting and reputable clinical context. Avoid filling the results with multiple generic physical therapy pages from the same type of publisher.",
+        generalQueries,
+        12
+      )
+    ]);
+
+    const results=[...communityResults,...clinicalResults,...generalResults].map(normalizeResult).filter(x=>x.url);
     const raw=await response.text();
     let data;
     try{data=JSON.parse(raw)}catch{
@@ -43,7 +78,14 @@ export default async function handler(req,res){
     const community=deduped.filter(x=>x.type==="community");
     const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
     const other=deduped.filter(x=>x.type==="journalism"||x.type==="other");
-    const selected=diversifyByDomain([...community,...clinical,...other],18);
+    // Keep the lived-experience layer visible even when the provider returns many
+    // clinical pages. Up to 10 community sources, then clinical verification, then other context.
+    const selected=diversifyByDomain([
+      ...community.slice(0,10),
+      ...clinical,
+      ...other,
+      ...community.slice(10)
+    ],18);
 
     const domains=[...new Set(selected.map(x=>x.domain).filter(Boolean))];
 
@@ -111,7 +153,7 @@ function canonical(u){try{const x=new URL(u);["utm_source","utm_medium","utm_cam
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
 function guessType(url,title){
   const h=(url+" "+title).toLowerCase();
-  if(/reddit|agingcare|forum|community|discussion|caregiver|patient.?story/.test(h))return "community";
+  if(/agingcare\.com|reddit\.com|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
   if(/parkinson\.org|lbda|movementdisorders\.org/.test(h))return "patient_org";
   if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|neuropt\.org|apta\.org|\.edu\//.test(h))return "clinical";
   if(/reuters|nytimes|washingtonpost|aarp|statnews|npr\.org/.test(h))return "journalism";
