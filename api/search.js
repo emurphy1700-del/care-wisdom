@@ -41,63 +41,120 @@ const OUTPUT_SCHEMA = {
   }
 };
 
+export const maxDuration = 60;
+
 export default async function handler(req,res){
-  if(req.method!=="POST" && req.method!=="GET") return res.status(405).json({error:"Method not allowed"});
+  if(req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   if(!process.env.PARALLEL_API_KEY) return res.status(503).json({error:"Live search provider credential is not configured on the server"});
 
   try{
-    if(req.method==="POST"){
-      const q=String(req.body?.query||"").trim();
-      if(!q) return res.status(400).json({error:"Query required"});
-      const runResp=await fetch("https://api.parallel.ai/v1/tasks/runs",{
-        method:"POST",
-        headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},
-        body:JSON.stringify({
-          processor:"core-fast",
-          input:researchPrompt(q),
-          task_spec:{output_schema:OUTPUT_SCHEMA}
-        })
+    const q=String(req.body?.query||"").trim();
+    if(!q) return res.status(400).json({error:"Query required"});
+
+    const response=await fetch("https://api.parallel.ai/v1/responses",{
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+process.env.PARALLEL_API_KEY,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        model:"parallel",
+        reasoning:{effort:"medium"},
+        instructions:researchInstructions(),
+        input:q,
+        text:{
+          format:{
+            type:"json_schema",
+            name:"care_wisdom_research",
+            schema:OUTPUT_SCHEMA.json_schema
+          }
+        }
+      })
+    });
+
+    const raw=await response.text();
+    let data;
+    try{data=JSON.parse(raw)}catch{
+      return res.status(502).json({error:"Research provider returned a non-JSON response",detail:raw.slice(0,900)});
+    }
+    if(!response.ok){
+      return res.status(502).json({
+        error:"Research provider rejected the request",
+        detail:data?.error?.message||data?.message||raw.slice(0,900)
       });
-      const runRaw=await runResp.text();
-      let runData; try{runData=JSON.parse(runRaw)}catch{
-        return res.status(502).json({error:"Research provider returned a non-JSON task response",detail:runRaw.slice(0,700)});
-      }
-      if(!runResp.ok) return res.status(502).json({error:"Research provider rejected the task",detail:runData?.error?.message||runData?.message||runRaw.slice(0,700)});
-      const runId=runData.run_id||runData.id||runData.run?.run_id;
-      if(!runId) return res.status(502).json({error:"Research provider did not return a task ID"});
-      return res.status(202).json({runId,status:runData.status||runData.run?.status||"queued",question:q});
     }
 
-    const runId=String(req.query?.runId||"").trim();
-    if(!runId) return res.status(400).json({error:"runId required"});
+    const outputText=extractResponseText(data);
+    if(!outputText) return res.status(502).json({error:"Research provider returned no research output"});
 
-    const statusResp=await fetch("https://api.parallel.ai/v1/tasks/runs/"+encodeURIComponent(runId),{
-      headers:{"x-api-key":process.env.PARALLEL_API_KEY}
-    });
-    const statusRaw=await statusResp.text();
-    let statusData; try{statusData=JSON.parse(statusRaw)}catch{
-      return res.status(502).json({error:"Research provider returned a non-JSON status response",detail:statusRaw.slice(0,700)});
+    let result;
+    try{result=JSON.parse(outputText)}catch(e){
+      return res.status(502).json({error:"Research result was not valid structured JSON",detail:outputText.slice(0,900)});
     }
-    if(!statusResp.ok) return res.status(502).json({error:"Could not check research task",detail:statusData?.error?.message||statusData?.message||statusRaw.slice(0,700)});
-
-    const run=statusData.run||statusData;
-    const status=run.status||statusData.status||"unknown";
-    if(status==="queued"||status==="running") return res.status(200).json({status,runId});
-    if(status==="failed") return res.status(200).json({status:"failed",runId,error:run.errors||run.error||"Research task failed"});
-    if(status!=="completed") return res.status(200).json({status,runId});
-
-    const resultResp=await fetch("https://api.parallel.ai/v1/tasks/runs/"+encodeURIComponent(runId)+"/result?timeout=5",{
-      headers:{"x-api-key":process.env.PARALLEL_API_KEY}
-    });
-    const resultRaw=await resultResp.text();
-    let resultData; try{resultData=JSON.parse(resultRaw)}catch{
-      return res.status(502).json({error:"Research result was not valid JSON",detail:resultRaw.slice(0,700)});
-    }
-    if(!resultResp.ok) return res.status(502).json({error:"Research task result could not be retrieved",detail:resultData?.error?.message||resultData?.message||resultRaw.slice(0,700)});
-    return res.status(200).json(normalizeResult(resultData,run.input?.query||""));
+    return res.status(200).json(normalizeResult(result,q));
   }catch(e){
-    return res.status(500).json({error:"Research failed",detail:String(e).slice(0,700)});
+    return res.status(500).json({error:"Research failed",detail:String(e).slice(0,900)});
   }
+}
+
+function extractResponseText(data){
+  if(typeof data?.output_text==="string") return data.output_text;
+  const out=Array.isArray(data?.output)?data.output:[];
+  for(const item of out){
+    if(typeof item?.text==="string") return item.text;
+    for(const part of (item?.content||[])){
+      if(typeof part?.text==="string") return part.text;
+    }
+  }
+  return "";
+}
+
+function researchInstructions(){
+return `You are Care Wisdom, a deep-research companion for Parkinson's disease and related caregiving questions.
+
+Conduct genuine live-web research. Break the user's question into 5-8 useful research branches and synthesize recurring findings across caregiver/patient lived experience, patient organizations, clinical guidance/reviews, and reputable journalism where useful.
+
+Care Wisdom is NOT a medical advice engine. Do not diagnose, prescribe, rank treatments, or turn anecdotes into instructions.
+
+SOURCE QUALITY:
+- Prefer genuinely independent sources and independent discussions.
+- Do not count multiple pages from the same publisher as independent.
+- Seek both lived-experience evidence and clinical evidence when appropriate.
+- Preserve disagreement and uncertainty.
+- Never invent a source, URL, quotation, study result, patient experience, or consensus.
+- A pattern must be an underlying recurring issue, not a webpage title.
+- If evidence is thin, say so.
+
+EVIDENCE PROFILE:
+Choose exactly one:
+repeated_independent = repeated across genuinely independent sources
+limited_support = some support but sparse, indirect, or concentrated
+strong_clinical_limited_lived = substantial clinical context but sparse lived experience
+mixed_conflicting = credible sources materially disagree
+too_thin = insufficient evidence for a meaningful pattern
+The rationale must explain the actual source mix. This is not a treatment recommendation or score.
+
+FOR EACH PATTERN:
+- What people reported: summarize actual patient/caregiver experiences; distinguish repeated from isolated reports.
+- Evidence check: summarize clinical evidence and limitations.
+- Disagreement: identify real disagreement or say when little disagreement was found.
+- Independence note: explain whether support comes from separate authors, studies, discussions, or domains.
+- Evidence trail: give 2-5 actual URLs that directly support the pattern.
+- Why this surfaced: explain the evidence trail.
+- Rabbit holes: useful next questions to investigate.
+- Source titles: actual source titles.
+
+CARE-TEAM QUESTIONS:
+Generate 2-4 concrete questions for relevant PROFESSIONALS only. Never list "Caregiver" or "Family" as a provider.
+Possible audiences:
+Neurologist / movement-disorders clinician; Physical therapist (PT); Occupational therapist (OT); SNF nursing supervisor / charge nurse; bedside SNF nurse; nurse practitioner / physician assistant; primary-care clinician; pharmacist; speech-language pathologist (SLP); social worker / case manager; dietitian.
+For questions involving an SNF, rehabilitation facility, transfers, falls, toileting, day-to-day function, blood-pressure/orthostatic events, or what happens outside therapy sessions, actively consider SNF nursing supervisor / charge nurse as a separate audience.
+Questions should clarify observations, measurements, barriers, goals, timing, safety, and what should be reassessed. Do not tell the user to change medication, exercise, hydration, diet, or treatment.
+
+SAFETY:
+Flag potentially urgent symptoms appropriately. Near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change should lead to appropriate clinical evaluation rather than self-experimentation. Keep the warning proportional to the evidence.
+
+Return only the requested structured JSON.`;
 }
 
 function researchPrompt(q){
