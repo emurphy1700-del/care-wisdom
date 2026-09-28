@@ -39,17 +39,22 @@ function render(d){
 }
 async function search(){
  const q=$('q').value.trim(); if(!q)return;
- $('status').textContent='Researching live sources…';
- $('results').innerHTML='<div class="empty">Care Wisdom is researching multiple branches, comparing lived experience with clinical context, and building questions for the relevant care-team members.</div>';
+ $('status').textContent='Finding sources…';
+ $('results').innerHTML='<div class="empty">Care Wisdom is finding independent patient/caregiver experiences and clinical sources…</div>';
  try{
   const r=await fetch('/api/search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q})});
   const raw=await r.text(); let d;
-  try{d=JSON.parse(raw)}catch{throw new Error('Server returned a non-JSON error ('+r.status+'): '+raw.slice(0,500))}
-  if(!r.ok)throw new Error(d.detail?d.error+': '+d.detail:d.error||'Research failed');
-  render(d);
-  if(d.safety_flags?.length){
-   $('results').insertAdjacentHTML('afterbegin','<div class="mini danger" style="margin-bottom:18px"><b>Clinical safety flag</b>'+esc(d.safety_flags.join(' '))+'</div>');
-  }
+  try{d=JSON.parse(raw)}catch{throw new Error('Source search returned a non-JSON error ('+r.status+').')}
+  if(!r.ok)throw new Error(d.detail?d.error+': '+d.detail:d.error||'Source search failed');
+  if(!d.sources?.length)throw new Error('No useful sources were found.');
+  $('status').textContent='Found '+d.sources.length+' sources — synthesizing…';
+  $('results').innerHTML='<div class="empty">Sources found. Now comparing lived experience, clinical context, disagreement, and care-team questions.</div>';
+  const s=await fetch('/api/synthesize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,sources:d.sources})});
+  const sraw=await s.text(); let out;
+  try{out=JSON.parse(sraw)}catch{throw new Error('Synthesis returned a non-JSON error ('+s.status+').')}
+  if(!s.ok)throw new Error(out.detail?out.error+': '+out.detail:out.error||'Synthesis failed');
+  render(out);
+  if(out.safety_flags?.length)$('results').insertAdjacentHTML('afterbegin','<div class="mini danger" style="margin-bottom:18px"><b>Clinical safety flag</b>'+esc(out.safety_flags.join(' '))+'</div>');
  }catch(e){
   $('status').textContent='Research error';
   $('results').innerHTML='<div class="empty">'+esc(e.message)+'</div>';
