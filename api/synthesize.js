@@ -74,7 +74,37 @@ if(!result||typeof result!=="object"){
     safety_flags:[]
   };
 }
+  // Normalize the evidence boundary after synthesis so the UI cannot accidentally
+  // present clinical material as firsthand experience.
+  result.patterns=(Array.isArray(result.patterns)?result.patterns:[]).map(p=>{
+    const x={...p};
+    if(x.category==="clinical_context"){
+      x.what_people_reported="This is clinical context. The supplied evidence does not establish a recurring firsthand patient/caregiver report of this specific finding.";
+      x.evidence_profile={...(x.evidence_profile||{}),level:x.evidence_profile?.level||"strong_clinical_limited_lived"};
+    }
+    // Rabbit holes are research directions, not treatment instructions.
+    x.rabbit_holes=(Array.isArray(x.rabbit_holes)?x.rabbit_holes:[]).map(v=>{
+      let s=String(v);
+      s=s.replace(/^(investigate|try|consider|use|increase|decrease|adjust|start|stop)\\b/i,"Explore evidence on");
+      return s;
+    });
+    return x;
+  });
   const domains=[...new Set(sources.map(s=>s.domain).filter(Boolean))];
-  return res.status(200).json({...result,question:result.question||q,sources,source_stats:{total:sources.length,independent_domains:domains.length,lived_experience_sources:sources.filter(s=>s.type==="community").length,domains}});
+  const lived=sources.filter(s=>s.type==="community");
+  const reddit=sources.filter(s=>s.domain==="reddit.com");
+  const aarp=sources.filter(s=>s.domain==="aarp.org");
+  const publicReporting=sources.filter(s=>s.type==="journalism");
+  const source_stats={
+    total:sources.length,
+    independent_domains:domains.length,
+    lived_experience_sources:lived.length,
+    selected_lived_experience_sources:lived.length,
+    reddit_sources:reddit.length,
+    aarp_sources:aarp.length,
+    public_sources:publicReporting.length,
+    domains
+  };
+  return res.status(200).json({...result,question:result.question||q,sources,source_stats});
  }catch(e){return res.status(500).json({error:"Synthesis failed",detail:String(e).slice(0,700)})}
 }
