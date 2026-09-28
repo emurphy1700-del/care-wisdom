@@ -89,7 +89,7 @@ if(!result||typeof result!=="object"){
     const expDomains=[...new Set(exp.map(s=>s.domain).filter(Boolean))];
     if((p.category==="lived_experience"||p.category==="mixed") && expDomains.length<2){
       const title=String(p.title||"");
-      promotedSingleReports.push("The research surfaced ""+title+"" but did not find enough distinct experiential source domains to call it a recurring lived-experience pattern.");
+      promotedSingleReports.push(`The research surfaced "${title}" but did not find enough distinct experiential source domains to call it a recurring lived-experience pattern.`);
       return false;
     }
     return true;
