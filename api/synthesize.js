@@ -4,9 +4,9 @@ export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
  if(!process.env.PARALLEL_API_KEY)return res.status(503).json({error:"Provider not configured"});
  try{
-  const q=String(req.body?.query||"").trim(), sources=Array.isArray(req.body?.sources)?req.body.sources.slice(0,14):[];
+  const q=String(req.body?.query||"").trim(), sources=Array.isArray(req.body?.sources)?req.body.sources.slice(0,12):[];
   if(!q||!sources.length)return res.status(400).json({error:"Query and sources required"});
-  const evidence=sources.map((s,i)=>`SOURCE ${i+1}\nTitle: ${s.title}\nURL: ${s.url}\nType: ${s.type}\nDomain: ${s.domain}\nExcerpts: ${(s.excerpts||[]).map(x=>String(x).slice(0,350)).join(" ")}`).join("\n\n");
+  const evidence=sources.map((s,i)=>"SOURCE "+(i+1)+"\nTitle: "+String(s.title).slice(0,180)+"\nURL: "+s.url+"\nType: "+s.type+"\nDomain: "+s.domain+"\nExcerpts: "+(s.excerpts||[]).slice(0,2).map(x=>String(x).slice(0,220)).join(" ")).join("\n\n");
   const prompt=`You are Care Wisdom. Synthesize ONLY the supplied sources for this caregiving question. Do not search again. Do not invent claims or sources.
 
 Question: ${q}
