@@ -17,7 +17,7 @@ export default async function handler(req,res){
         },
         body:JSON.stringify({
           objective,
-          search_queries:search_queries.slice(0,3),
+          search_queries:search_queries.slice(0,8),
           advanced_settings:{max_results}
         })
       });
@@ -33,12 +33,14 @@ export default async function handler(req,res){
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
     const communityQueries=[
-      q+" caregiver experience what helped",
-      q+" patient caregiver forum what helped",
-      "site:agingcare.com/questions "+q,
-      "site:reddit.com/r/Parkinsons "+q,
-      "site:reddit.com/r/ParkinsonsCaregivers "+q,
-      q+" freezing standing from chair caregiver"
+      "site:reddit.com/r/Parkinsons/comments/ "+q+" caregiver",
+      "site:reddit.com/r/ParkinsonsCaregivers/comments/ "+q+" caregiver",
+      "site:agingcare.com/questions "+q+" caregiver experience",
+      q+" caregiver experience what helped forum",
+      q+" patient caregiver discussion what helped",
+      q+" freezing standing from chair caregiver",
+      "site:myparkinsons.org "+q+" forum",
+      "site:parkinson.org caregiver freezing chair transfer"
     ];
     const clinicalQueries=[
       q+" clinical evidence rehabilitation",
