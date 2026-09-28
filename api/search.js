@@ -6,13 +6,13 @@ export default async function handler(req,res){
  try{
   const r=await fetch('https://api.parallel.ai/v1/search',{method:'POST',headers:{'x-api-key':process.env.PARALLEL_API_KEY,'content-type':'application/json'},body:JSON.stringify({
    objective:'Research a caregiving or health question for a research companion. Search broadly but deliberately. Use community/patient/caregiver sources to discover lived experience and practical problems; use authoritative clinical sources separately for medical context. Prefer independent sources and preserve disagreement. Do not diagnose, prescribe, rank treatments, or treat anecdotes as medical conclusions. Return source URLs, titles, and useful excerpts.',
-   search_queries:queries.map(x=>x.slice(0,200)), max_results:20
+   search_queries:queries.map(x=>x.slice(0,200)), max_results:30
   })});
   const rawResponse=await r.text(); let data; try{data=JSON.parse(rawResponse)}catch{return res.status(502).json({error:'Search provider returned a non-JSON response',detail:rawResponse.slice(0,500)})} if(!r.ok)return res.status(502).json({error:'Search provider error',detail:data?.error?.message||data?.message||'Provider rejected the request'});
   const raw=(data.results||[]).map(x=>({url:x.url,title:x.title||x.url,excerpts:Array.isArray(x.excerpts)?x.excerpts:[],text:x.text||x.content||''}));
   const sources=dedupe(raw).map(x=>({...x,kind:classify(x.url,x.title)}));
-  const clusters=buildClusters(sources);
-  return res.status(200).json({sources,clusters,safety:detectSafety(q),search_angles:queries});
+  const clusters=buildClusters(sources); const domains=[...new Set(sources.map(x=>domainOf(x.url)).filter(Boolean))];
+  return res.status(200).json({sources,clusters,safety:detectSafety(q),search_angles:queries,source_stats:{total:sources.length,independent_domains:domains.length,domains}});
  }catch(e){return res.status(500).json({error:'Search failed',detail:process.env.NODE_ENV==='development'?String(e):undefined})}
 }
 
@@ -36,6 +36,7 @@ function dedupe(items){const seen=new Set();const out=[];for(const x of items){c
 function norm(s){return String(s||'').toLowerCase().replace(/https?:\/\/\S+/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
 function tokens(s){return new Set(norm(s).split(' ').filter(x=>x.length>3))}
 function jaccard(a,b){const A=tokens(a),B=tokens(b);let inter=0;for(const x of A)if(B.has(x))inter++;const union=new Set([...A,...B]).size;return union?inter/union:0}
+function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,'')}catch{return ''}}
 function classify(url,title){const h=(url+' '+title).toLowerCase();if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|parkinson\.org|movementdisorders\.org|neuropt\.org|apta\.org|lbda/.test(h))return 'clinical/patient organization';if(/reddit|agingcare|forum|community|discussion|patient|caregiver/.test(h))return 'community/lived experience';return 'journalism/general web'}
 
 function buildClusters(src){
