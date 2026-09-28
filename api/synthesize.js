@@ -20,9 +20,11 @@ Return ONLY valid JSON with this shape:
 Produce 1–4 strong patterns, but ONLY when the evidence clears the following bar. A pattern must be an underlying recurring issue, not a webpage title or generic Parkinson's fact.
 
 EVIDENCE THRESHOLD:
-- A lived-experience pattern normally requires reports from at least 2 genuinely independent people/discussions, ideally across different domains.
-- Multiple URLs from AARP, one forum, one publication, or one organization count as ONE publisher/source cluster, not multiple independent reports.
+- A lived-experience pattern requires at least 2 experiential source records from different domains. This is a MINIMUM source-diversity threshold, not proof that the reports come from different people.
+- Treat multiple URLs from AARP, one forum, one publication, or one organization as ONE publisher/source cluster, not multiple independent experiences.
+- Do not call sources "independent people" unless the supplied records actually establish distinct people or discussion threads.
 - A single firsthand report can be shown only as a clearly labeled "single report worth exploring," NOT as a recurring pattern.
+- If the evidence contains only one experiential source plus clinical sources, do NOT create a mixed/lived pattern. Put the firsthand item in single_reports and, if useful, create a separate clinical-context pattern.
 - A clinical-context pattern may be included when supported by multiple independent clinical sources, but it must be labeled CLINICAL CONTEXT and must NEVER claim that "people reported" the clinical finding.
 - If the evidence does not meet these thresholds, omit the pattern and put the finding in research limitations or "single reports worth exploring."
 - Prefer fewer genuine patterns over filling the page with weak ones.
@@ -74,6 +76,28 @@ if(!result||typeof result!=="object"){
     safety_flags:[]
   };
 }
+  // Deterministic evidence guard: the model cannot promote a pattern to lived/mixed
+  // experience unless its own evidence trail contains at least two experiential
+  // source domains. This prevents clinical pages from being counted as caregiver reports.
+  const sourceByUrl=new Map(sources.map(s=>[String(s.url||""),s]));
+  const experientialTypes=new Set(["community","journalism"]);
+  const promotedSingleReports=[];
+  result.patterns=(Array.isArray(result.patterns)?result.patterns:[]).filter(p=>{
+    const trail=Array.isArray(p.evidence_trail)?p.evidence_trail:[];
+    const exp=trail.map(t=>sourceByUrl.get(String(t.url||""))||t)
+      .filter(s=>experientialTypes.has(s.type));
+    const expDomains=[...new Set(exp.map(s=>s.domain).filter(Boolean))];
+    if((p.category==="lived_experience"||p.category==="mixed") && expDomains.length<2){
+      const title=String(p.title||"");
+      promotedSingleReports.push("The research surfaced ""+title+"" but did not find enough distinct experiential source domains to call it a recurring lived-experience pattern.");
+      return false;
+    }
+    return true;
+  });
+  if(promotedSingleReports.length){
+    result.single_reports=[...(Array.isArray(result.single_reports)?result.single_reports:[]),...promotedSingleReports];
+    result.limitations=[...(Array.isArray(result.limitations)?result.limitations:[]),"Lived-experience evidence was thinner than the clinical evidence for some findings; source-domain diversity was not treated as proof of independent people."];
+  }
   // Normalize the evidence boundary after synthesis so the UI cannot accidentally
   // present clinical material as firsthand experience.
   result.patterns=(Array.isArray(result.patterns)?result.patterns:[]).map(p=>{
