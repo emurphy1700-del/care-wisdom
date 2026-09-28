@@ -17,7 +17,23 @@ ${evidence}
 Return ONLY valid JSON with this shape:
 {"question":"","overview":"","patterns":[{"title":"","category":"lived_experience|clinical_context|mixed","evidence_profile":{"level":"repeated_independent|limited_support|strong_clinical_limited_lived|mixed_conflicting|too_thin","label":"","rationale":""},"what_people_reported":"","evidence_check":"","disagreement":"","independence_note":"","care_team_questions":[{"provider":"","questions":[""]}],"evidence_trail":[{"title":"","url":"","type":"","role":""}],"why_this_surfaced":"","rabbit_holes":[""],"source_titles":[""]}],"limitations":[""],"safety_flags":[""]}
 
-Produce 2–5 strong patterns. A pattern must be an underlying recurring issue supported by multiple relevant passages or by one unusually direct firsthand report plus clinical context—not a webpage title and not a generic fact about Parkinson's. At least half of the patterns should come from lived experience/public reporting when the supplied sources contain such material. Do NOT turn a clinical fact into a "what people reported" claim. For each pattern, explicitly distinguish firsthand reports, public reporting, and clinical evidence. Count independent people/discussions conservatively: different URLs from the same publisher are not independent people. Do not count multiple pages from one publisher as independent. Preserve disagreement. Care-team questions must be for professionals only; for rehab/SNF questions consider PT, OT, nursing supervisor/charge nurse, bedside nurse, neurologist, pharmacist, NP/PA, primary care, SLP, social worker/case manager, or dietitian as relevant. Do not prescribe or tell the user to change treatment. Flag near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change for clinical evaluation.`;
+Produce 1–4 strong patterns, but ONLY when the evidence clears the following bar. A pattern must be an underlying recurring issue, not a webpage title or generic Parkinson's fact.
+
+EVIDENCE THRESHOLD:
+- A lived-experience pattern normally requires reports from at least 2 genuinely independent people/discussions, ideally across different domains.
+- Multiple URLs from AARP, one forum, one publication, or one organization count as ONE publisher/source cluster, not multiple independent reports.
+- A single firsthand report can be shown only as a clearly labeled "single report worth exploring," NOT as a recurring pattern.
+- A clinical-context pattern may be included when supported by multiple independent clinical sources, but it must be labeled CLINICAL CONTEXT and must NEVER claim that "people reported" the clinical finding.
+- If the evidence does not meet these thresholds, omit the pattern and put the finding in research limitations or "single reports worth exploring."
+- Prefer fewer genuine patterns over filling the page with weak ones.
+
+For every pattern, explicitly separate:
+1. WHAT PEOPLE REPORTED — only firsthand patient/caregiver/public-reporting observations.
+2. EVIDENCE CHECK — what clinical literature or professional guidance says, if anything.
+3. DISAGREEMENT/UNCERTAINTY — what remains unresolved.
+Never put clinical study findings in WHAT PEOPLE REPORTED.
+
+Do not manufacture independent counts. Do not treat a search snippet, generic caregiver guide, or one publisher's collection of stories as multiple independent experiences. Do not count multiple pages from one publisher as independent. Preserve disagreement. Care-team questions must be for professionals only; for rehab/SNF questions consider PT, OT, nursing supervisor/charge nurse, bedside nurse, neurologist, pharmacist, NP/PA, primary care, SLP, social worker/case manager, or dietitian as relevant. Do not prescribe or tell the user to change treatment. Flag near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change for clinical evaluation.`;
   const schema={
  type:"object",additionalProperties:false,
  properties:{
