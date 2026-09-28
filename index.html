@@ -8,13 +8,13 @@
 :root{--ink:#183247;--muted:#66737e;--paper:#fbfaf7;--card:#fff;--line:#dfe3e5;--sage:#9fc5b5;--blue:#dceaf3;--gold:#f4e4bd;--red:#f4d9d5}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;background:var(--paper);color:#1d2a33;line-height:1.5}
 header{background:var(--ink);color:#fff;padding:42px max(22px,6vw) 48px}.brand{font-size:13px;font-weight:800;letter-spacing:.16em}.hero{max-width:1000px;margin:auto}.hero h1{font-size:clamp(32px,5vw,56px);line-height:1.03;margin:22px 0 12px;max-width:760px}.hero p{max-width:720px;color:#d7e1e8;font-size:17px}
-.search{display:flex;gap:10px;margin-top:25px}.search input{flex:1;padding:17px 18px;border:0;border-radius:12px;font-size:16px}.btn{border:0;border-radius:12px;padding:0 20px;font-weight:800;cursor:pointer}.primary{background:var(--sage);color:#17372e}.secondary{background:#eef3f5;color:var(--ink);padding:10px 14px}.search .btn{background:var(--sage);color:#17372e}
+.search{display:flex;gap:10px;margin-top:25px;align-items:flex-end}.searchbox{flex:1;min-width:0}.search textarea{width:100%;min-height:58px;max-height:360px;overflow-y:auto;padding:17px 18px;border:0;border-radius:12px;font-size:16px;font:inherit;line-height:1.45;resize:none;display:block}.query-meta{display:flex;justify-content:flex-end;margin-top:5px;padding-right:3px;color:#b9c9d2;font-size:12px}.query-meta.near-limit{color:#f4d9d5}.search .btn{height:58px}.btn{border:0;border-radius:12px;padding:0 20px;font-weight:800;cursor:pointer}.primary{background:var(--sage);color:#17372e}.secondary{background:#eef3f5;color:var(--ink);padding:10px 14px}.search .btn{background:var(--sage);color:#17372e}
 main{max-width:1120px;margin:28px auto;padding:0 20px}.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);gap:20px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 2px 8px #1832470b}.card h2,.card h3{margin-top:0}.muted{color:var(--muted);font-size:14px}.status{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.pattern{border-top:1px solid var(--line);padding:22px 0}.pattern:first-child{border-top:0}.eyebrow{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#527082}.pattern h3{font-size:21px;margin:5px 0 8px}.pill{display:inline-block;background:var(--blue);border-radius:999px;padding:4px 9px;font-size:11px;margin:0 5px 5px 0}.pill.gold{background:var(--gold)}.pill.red{background:var(--red)}.evidence-profile{display:flex;align-items:flex-start;gap:10px;background:#f7f8f8;border-radius:12px;padding:13px;margin:12px 0}.evidence-dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;margin-top:4px}.evidence-dot.strong{background:#6c9b7b}.evidence-dot.limited{background:#c7a64b}.evidence-dot.clinical{background:#6d8fb0}.evidence-dot.mixed{background:#b57972}.evidence-dot.thin{background:#8b9297}.evidence-profile b{display:block;margin-bottom:2px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.mini{background:#f7f8f8;border-radius:12px;padding:13px}.mini b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}.sources{margin-top:12px}.source{padding:9px 0;border-top:1px solid #edf0f1}.source a{color:#245a78;text-decoration:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.danger{background:#fff3f0;border-color:#efd3cd}.note-form textarea,.note-form input,.auth input{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit}.note-form textarea{min-height:110px;resize:vertical}.note{padding:13px 0;border-top:1px solid var(--line)}.note:first-child{border-top:0}.authrow{display:flex;gap:8px}.authrow input{flex:1}.small{font-size:12px}.evidence-note{background:#f5f7f7;border-radius:12px;padding:13px;margin:12px 0}.source-breakdown{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.hidden{display:none!important}.empty{padding:28px 0;color:var(--muted)}
 @media(max-width:800px){.layout{grid-template-columns:1fr}.search{flex-direction:column}.search .btn{height:50px}.grid2{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header><div class="hero"><div class="brand">CARE WISDOM</div><h1>Practical experience, turned into better questions.</h1><p>Find recurring caregiver and patient experiences, then separate them from clinical context and uncertainty. Anecdotes are discovery evidence — not medical advice.</p>
-<div class="search"><input id="q" aria-label="Research question" value="Parkinson's toileting assistance with Hoyer lift"><button class="btn" id="searchBtn">Search live</button></div></div></header>
+<div class="search"><div class="searchbox"><textarea id="q" aria-label="Research question" maxlength="20000" rows="2">Parkinson's toileting assistance with Hoyer lift</textarea><div id="queryMeta" class="query-meta" aria-live="polite">0 / 20,000</div></div><button class="btn" id="searchBtn">Search live</button></div></div></header>
 <main><div class="layout"><section><div class="card"><div class="status"><h2>Research patterns</h2><span id="status" class="muted">Ready.</span></div><div id="results"><div class="empty">Ask a messy real-life question. Care Wisdom will look for recurring lived-experience patterns, disagreement, and clinical context.</div></div></div></section>
 <aside>
 <div class="card danger"><h3>Safety first</h3><p class="muted">Care Wisdom does not diagnose or prescribe. If a question involves fainting/near-fainting, falls, acute confusion, choking or breathing trouble, or medication changes, the app highlights the need for clinical evaluation rather than turning anecdotes into instructions.</p></div>
@@ -22,6 +22,7 @@ main{max-width:1120px;margin:28px auto;padding:0 20px}.layout{display:grid;grid-
 <div id="notebookBox" class="hidden"><div class="status"><span id="userEmail" class="small"></span><button class="btn secondary" id="signOut">Sign out</button></div><div class="note-form"><input id="noteTitle" placeholder="Entry title"><textarea id="noteBody" placeholder="Observation, question, care-team note, research note, or event"></textarea><input id="noteTags" placeholder="Tags, separated by commas" style="margin-top:8px"><button class="btn primary" id="saveNote" style="margin-top:8px">Save to notebook</button></div><div id="notes" style="margin-top:14px"></div></div></div>
 </aside></div></main>
 <script>
+const MAX_QUERY_LENGTH=20000;
 const SUPABASE_URL='https://uxcbngbwtxhwrasgfuyd.supabase.co';
 const SUPABASE_KEY='sb_publishable_HRnSKY7XFIpE2hnEnAyIHg_948i-9E8';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -62,8 +63,23 @@ async function search(){
   $('results').innerHTML='<div class="empty">'+esc(e.message)+'</div>';
  }
 }
+function resizeQuery(){
+ const el=$('q');
+ el.style.height='auto';
+ el.style.height=Math.min(Math.max(el.scrollHeight,58),360)+'px';
+}
+function updateQueryMeta(){
+ const n=$('q').value.length;
+ $('queryMeta').textContent=n.toLocaleString()+' / 20,000';
+ $('queryMeta').classList.toggle('near-limit',n>=19000);
+ resizeQuery();
+}
+$('q').addEventListener('input',updateQueryMeta);
 $('searchBtn').addEventListener('click',search);
-$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search();}});
+$('q').addEventListener('keydown',e=>{
+ if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();search();}
+});
+updateQueryMeta();
 
 async function loadNotes(){const {data:{user}}=await sb.auth.getUser();if(!user){$('authBox').classList.remove('hidden');$('notebookBox').classList.add('hidden');return}$('authBox').classList.add('hidden');$('notebookBox').classList.remove('hidden');$('userEmail').textContent=user.email||'Signed in';const {data,error}=await sb.from('notebook_entries').select('*').order('occurred_at',{ascending:false}).order('created_at',{ascending:false});if(error){$('notes').innerHTML=`<p class="small muted">Could not load notebook: ${esc(error.message)}</p>`;return}$('notes').innerHTML=(data||[]).map(n=>`<div class="note"><b>${esc(n.title||'Untitled')}</b><div class="small muted">${esc(n.entry_type||'note')} · ${new Date(n.created_at).toLocaleString()}</div><p>${esc(n.body)}</p>${(n.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</div>`).join('')||'<p class="muted">No entries yet.</p>'}
 $('signUp').onclick=async()=>{const {error}=await sb.auth.signUp({email:$('email').value,password:$('password').value});$('authMsg').textContent=error?error.message:'Account created. Check your email if confirmation is enabled.';if(!error)loadNotes()};
