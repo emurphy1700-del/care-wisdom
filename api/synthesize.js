@@ -4,9 +4,9 @@ export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
  if(!process.env.PARALLEL_API_KEY)return res.status(503).json({error:"Provider not configured"});
  try{
-  const q=String(req.body?.query||"").trim(), sources=Array.isArray(req.body?.sources)?req.body.sources.slice(0,12):[];
+  const q=String(req.body?.query||"").trim(), sources=Array.isArray(req.body?.sources)?req.body.sources.slice(0,18):[];
   if(!q||!sources.length)return res.status(400).json({error:"Query and sources required"});
-  const evidence=sources.map((s,i)=>"SOURCE "+(i+1)+"\nTitle: "+String(s.title).slice(0,180)+"\nURL: "+s.url+"\nType: "+s.type+"\nDomain: "+s.domain+"\nExcerpts: "+(s.excerpts||[]).slice(0,2).map(x=>String(x).slice(0,220)).join(" ")).join("\n\n");
+  const evidence=sources.map((s,i)=>"SOURCE "+(i+1)+"\nTitle: "+String(s.title).slice(0,180)+"\nURL: "+s.url+"\nType: "+s.type+"\nDomain: "+s.domain+"\nExtracted: "+(s.extracted?"yes":"no")+"\nPassages: "+(s.excerpts||[]).slice(0,4).map(x=>String(x).slice(0,650)).join(" ")).join("\n\n");
   const prompt=`You are Care Wisdom. Synthesize ONLY the supplied sources for this caregiving question. Do not search again. Do not invent claims or sources.
 
 Question: ${q}
@@ -17,7 +17,7 @@ ${evidence}
 Return ONLY valid JSON with this shape:
 {"question":"","overview":"","patterns":[{"title":"","category":"lived_experience|clinical_context|mixed","evidence_profile":{"level":"repeated_independent|limited_support|strong_clinical_limited_lived|mixed_conflicting|too_thin","label":"","rationale":""},"what_people_reported":"","evidence_check":"","disagreement":"","independence_note":"","care_team_questions":[{"provider":"","questions":[""]}],"evidence_trail":[{"title":"","url":"","type":"","role":""}],"why_this_surfaced":"","rabbit_holes":[""],"source_titles":[""]}],"limitations":[""],"safety_flags":[""]}
 
-Produce no more than 4 strong patterns. A pattern must be an underlying recurring issue, not a webpage title. Prefer genuinely independent lived-experience reports and compare them with clinical context. Do not count multiple pages from one publisher as independent. Preserve disagreement. Care-team questions must be for professionals only; for rehab/SNF questions consider PT, OT, nursing supervisor/charge nurse, bedside nurse, neurologist, pharmacist, NP/PA, primary care, SLP, social worker/case manager, or dietitian as relevant. Do not prescribe or tell the user to change treatment. Flag near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change for clinical evaluation.`;
+Produce 2–5 strong patterns. A pattern must be an underlying recurring issue supported by multiple relevant passages or by one unusually direct firsthand report plus clinical context—not a webpage title and not a generic fact about Parkinson's. At least half of the patterns should come from lived experience/public reporting when the supplied sources contain such material. Do NOT turn a clinical fact into a "what people reported" claim. For each pattern, explicitly distinguish firsthand reports, public reporting, and clinical evidence. Count independent people/discussions conservatively: different URLs from the same publisher are not independent people. Do not count multiple pages from one publisher as independent. Preserve disagreement. Care-team questions must be for professionals only; for rehab/SNF questions consider PT, OT, nursing supervisor/charge nurse, bedside nurse, neurologist, pharmacist, NP/PA, primary care, SLP, social worker/case manager, or dietitian as relevant. Do not prescribe or tell the user to change treatment. Flag near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change for clinical evaluation.`;
   const schema={
  type:"object",additionalProperties:false,
  properties:{
