@@ -1,5 +1,3 @@
-export const maxDuration = 10;
-
 const OUTPUT_SCHEMA = {
   type: "json",
   json_schema: {
