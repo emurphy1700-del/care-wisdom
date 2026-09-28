@@ -53,7 +53,7 @@ export default async function handler(req,res){
         method:"POST",
         headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},
         body:JSON.stringify({
-          processor:"base",
+          processor:"core-fast",
           input:researchPrompt(q),
           task_spec:{output_schema:OUTPUT_SCHEMA}
         })
