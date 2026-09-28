@@ -15,7 +15,7 @@ Sources:
 ${evidence}
 
 Return ONLY valid JSON with this shape:
-{"question":"","overview":"","patterns":[{"title":"","category":"lived_experience|clinical_context|mixed","evidence_profile":{"level":"repeated_independent|limited_support|strong_clinical_limited_lived|mixed_conflicting|too_thin","label":"","rationale":""},"what_people_reported":"","evidence_check":"","disagreement":"","independence_note":"","care_team_questions":[{"provider":"","questions":[""]}],"evidence_trail":[{"title":"","url":"","type":"","role":""}],"why_this_surfaced":"","rabbit_holes":[""],"source_titles":[""]}],"limitations":[""],"safety_flags":[""]}
+{"question":"","overview":"","single_reports":[],"patterns":[{"title":"","category":"lived_experience|clinical_context|mixed","evidence_profile":{"level":"repeated_independent|limited_support|strong_clinical_limited_lived|mixed_conflicting|too_thin","label":"","rationale":""},"what_people_reported":"","evidence_check":"","disagreement":"","independence_note":"","care_team_questions":[{"provider":"","questions":[""]}],"evidence_trail":[{"title":"","url":"","type":"","role":""}],"why_this_surfaced":"","rabbit_holes":[""],"source_titles":[""]}],"limitations":[""],"safety_flags":[""]}
 
 Produce 1–4 strong patterns, but ONLY when the evidence clears the following bar. A pattern must be an underlying recurring issue, not a webpage title or generic Parkinson's fact.
 
@@ -38,6 +38,7 @@ Do not manufacture independent counts. Do not treat a search snippet, generic ca
  type:"object",additionalProperties:false,
  properties:{
   question:{type:"string"},overview:{type:"string"},
+  single_reports:{type:"array",items:{type:"string"}},
   patterns:{type:"array",items:{type:"object",additionalProperties:false,properties:{
    title:{type:"string"},category:{type:"string"},
    evidence_profile:{type:"object",additionalProperties:false,properties:{level:{type:"string"},label:{type:"string"},rationale:{type:"string"}},required:["level","label","rationale"]},
@@ -47,7 +48,7 @@ Do not manufacture independent counts. Do not treat a search snippet, generic ca
    why_this_surfaced:{type:"string"},rabbit_holes:{type:"array",items:{type:"string"}},source_titles:{type:"array",items:{type:"string"}}
   },required:["title","category","evidence_profile","what_people_reported","evidence_check","disagreement","independence_note","care_team_questions","evidence_trail","why_this_surfaced","rabbit_holes","source_titles"]}},
   limitations:{type:"array",items:{type:"string"}},safety_flags:{type:"array",items:{type:"string"}}
- },required:["question","overview","patterns","limitations","safety_flags"]
+ },required:["question","overview","single_reports","patterns","limitations","safety_flags"]
 };
 const r=await fetch("https://api.parallel.ai/v1/responses",{method:"POST",headers:{"Authorization":"Bearer "+process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({
  model:"parallel",reasoning:{effort:"low"},instructions:"Synthesize only the supplied sources. Never invent evidence. Produce no more than 4 genuine underlying patterns. A pattern must be a recurring issue supported by the supplied evidence, not a webpage title. Distinguish lived experience from clinical context. Preserve disagreement. Do not diagnose or prescribe.",
@@ -68,6 +69,7 @@ if(!result||typeof result!=="object"){
     question:q,
     overview:cleaned,
     patterns:[],
+    single_reports:[],
     limitations:["The research model returned a narrative synthesis rather than structured evidence. No unsupported claims were converted into patterns."],
     safety_flags:[]
   };
