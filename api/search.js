@@ -15,12 +15,53 @@ export default async function handler(req,res){
  }catch(e){return res.status(500).json({error:'Research failed',detail:String(e).slice(0,500)})}
 }
 function researchPrompt(q){return `You are Care Wisdom's deep-research engine. User question: "${q.replace(/"/g,'\\\"')}"
-Do a source-diverse, multi-step web investigation. Decompose the question into 5-8 research branches appropriate to the actual problem. Seek independent caregiver/patient/community discussions, patient/family organizations, peer-reviewed/government/academic medical sources, and high-quality journalism when useful. Do not pad results with generic pages or many pages from one site.
-Synthesize only genuine recurring patterns. A pattern is an underlying practical issue supported by multiple relevant reports or by strong clinical context—not a source title. Distinguish independent reports from multiple pages on one domain. Compare lived experience with clinical evidence. Preserve disagreement and uncertainty. Do not diagnose, prescribe, rank treatments, or turn anecdotes into instructions. Generate 2-4 concrete questions for each pattern and assign them to the most relevant provider. Use only providers genuinely relevant to that pattern. Possible audiences include Neurologist/Movement-disorders clinician, Physical therapist (PT), Occupational therapist (OT), SNF nursing supervisor/charge nurse, bedside SNF nurse, Nurse/NP/PA, Primary-care clinician, Pharmacist, Speech-language pathologist (SLP), Social worker/case manager, and Dietitian. For SNF-related questions, treat nursing supervision as a distinct audience for day-to-day observations, blood-pressure/orthostatic events, falls, transfers, toileting, staffing/supervision, care-plan communication, and changes outside therapy. Make questions practical and caregiver-ready. Also provide why_this_surfaced, a 2-5 item evidence_trail with source role, and 3-6 rabbit_holes.
-Prefer 12-25 genuinely useful sources when the evidence supports it. If evidence is thin, say so.
+Do a source-diverse, evidence-traceable web investigation. Decompose the question into 5-8 RESEARCH BRANCHES. A research branch is a question or avenue being investigated; it must NOT assert an answer unless the cited evidence supports it. Example: "Medication timing and exercise" rather than "Patients often exercise during off periods."
+
+SOURCE REQUIREMENTS:
+- Aim for 12-25 genuinely useful sources when available.
+- Seek at least 3 independent lived-experience/community sources or independent discussions when the question calls for practical experience.
+- Seek at least 3 independent clinical/medical sources for medical claims.
+- Use multiple independent domains. Do not pad with multiple pages from one organization.
+- If the evidence really is thin, return fewer sources but explicitly say that evidence is thin in limitations.
+- Never invent a source, URL, quotation, patient experience, study result, or consensus.
+- Distinguish a source's actual findings from your own synthesis.
+
+SYNTHESIS:
+A pattern is an underlying practical issue supported by multiple relevant independent reports, or by strong clinical evidence. It is NOT a webpage title, generic advice, or a plausible-sounding hypothesis.
+For each pattern:
+- "what_people_reported" must summarize actual lived-experience evidence and identify whether reports are repeated, mixed, or sparse.
+- "evidence_check" must summarize actual clinical/medical evidence and its limitations.
+- "disagreement" must preserve meaningful disagreement rather than manufacture it.
+- "independence_note" must explain the actual basis for independence (for example, separate studies, separate authors, separate community discussions, or multiple domains). Do not call multiple pages from one publisher independent.
+- "why_this_surfaced" must explain the evidence trail behind the pattern.
+- "evidence_trail" should contain 2-5 of the most directly supporting sources, with their actual role.
+- "rabbit_holes" should be useful next research questions, not claims.
+
+CARE-TEAM QUESTIONS:
+Generate 2-4 concrete, caregiver-ready questions for the relevant PROFESSIONALS only. Do not put "Caregiver" or "Family" inside care_team_questions; those are not providers.
+Possible providers include:
+- Neurologist / movement-disorders clinician
+- Physical therapist (PT)
+- Occupational therapist (OT)
+- SNF nursing supervisor / charge nurse
+- Bedside SNF nurse
+- Nurse practitioner / physician assistant
+- Primary-care clinician
+- Pharmacist
+- Speech-language pathologist (SLP)
+- Social worker / case manager
+- Dietitian
+Use only providers genuinely relevant to the pattern.
+For ANY question involving a skilled nursing facility, rehabilitation facility, transfers, falls, toileting, day-to-day functional changes, blood-pressure/orthostatic events, or what happens outside therapy sessions, actively consider "SNF nursing supervisor / charge nurse" as a separate audience. They may have observations that PT/OT do not.
+Questions should help the family clarify what is happening, what is being measured, what barriers have been identified, and what should be reassessed. Do not instruct the user to change medication, exercise, hydration, diet, or treatment.
+
+SAFETY:
+Do not diagnose, prescribe, rank treatments, or turn anecdotes into instructions. For potentially urgent symptoms, identify the need for appropriate clinical evaluation. Avoid blanket statements such as "do not begin exercise without medical clearance" unless the actual evidence specifically supports that context.
+
 Return ONLY valid JSON:
 {"question":string,"research_branches":[{"name":string,"why":string}],"overview":string,"patterns":[{"title":string,"category":"lived_experience|clinical_context|mixed","what_people_reported":string,"evidence_check":string,"disagreement":string,"independence_note":string,"care_team_questions":[{"provider":string,"questions":[string]}],"evidence_trail":[{"title":string,"url":string,"type":string,"role":string}],"why_this_surfaced":string,"rabbit_holes":[string],"source_titles":[string]}],"sources":[{"title":string,"url":string,"type":"community|patient_org|clinical|journalism|other","domain":string}],"limitations":[string],"safety_flags":[string]}
 Use only sources actually researched; never invent URLs or citations.`;}
+
 function outputText(data){if(data.output_text)return data.output_text;for(const item of(data.output||[]))for(const p of(item.content||[]))if(p.type==='output_text'&&p.text)return p.text;return '';}
 function getCitations(data){const a=[];for(const item of(data.output||[]))for(const p of(item.content||[]))for(const x of(p.annotations||[]))if(x.type==='url_citation'&&x.url)a.push({title:x.title||x.url,url:x.url,type:guessType(x.url,x.title||'')});return a;}
 function normalizeSources(items){const seen=new Set(),out=[];for(const s of items){const url=canonical(s.url||'');if(!url||seen.has(url))continue;seen.add(url);out.push({title:s.title||url,url,type:['community','patient_org','clinical','journalism','other'].includes(s.type)?s.type:guessType(url,s.title||''),domain:domainOf(url)});}return out.slice(0,30);}
