@@ -135,7 +135,7 @@ export default async function handler(req,res){
           },
           body:JSON.stringify({
             urls:urls.slice(i,i+10),
-            objective:"Extract only passages relevant to this caregiving question: what happened to the patient or caregiver, what barrier or problem was observed, what was tried, what happened afterward, and any disagreement or uncertainty. For clinical sources, extract the specific evidence or guidance relevant to the barrier. Ignore navigation, marketing, generic disease definitions, and unrelated material."
+            objective:"For the user's research question — "+q+" — extract only passages directly relevant to that question. For firsthand sources, extract the person's actual experience: what happened, what barrier or problem was observed, what was tried, and what happened afterward. For clinical sources, extract the specific evidence or guidance relevant to the question. Ignore navigation, marketing, generic disease definitions, unrelated material, and broad background that does not answer the question."
           })
         });
         const eraw=await er.text();
