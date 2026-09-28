@@ -152,7 +152,7 @@ Questions should clarify observations, measurements, barriers, goals, timing, sa
 SAFETY:
 Flag potentially urgent symptoms appropriately. Near-fainting/fainting, repeated falls, acute confusion, chest pain, breathing difficulty, choking, or sudden neurological change should lead to appropriate clinical evaluation rather than self-experimentation. Keep the warning proportional to the evidence.
 
-Return only the requested structured JSON.`;
+Return only the requested structured JSON. Keep research branches investigative. For example, prefer "Could medication timing or symptom fluctuations be affecting PT performance?" over "Medication timing vs. exercise schedule."`;
 }
 
 function researchPrompt(q){
