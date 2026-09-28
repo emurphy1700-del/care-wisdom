@@ -17,7 +17,7 @@ export default async function handler(req,res){
       body:JSON.stringify({
         objective:"Find high-value sources for a caregiving research question. Prioritize genuinely independent patient/caregiver lived-experience discussions and high-quality clinical or patient-organization context. Return source titles, URLs, domains, publication dates when available, and concise excerpts. Do not synthesize or diagnose.",
         search_queries:queries,
-        advanced_settings:{max_results:24}
+        advanced_settings:{max_results:40}
       })
     });
     const raw=await response.text();
@@ -36,13 +36,28 @@ export default async function handler(req,res){
       if(!key||seen.has(key)) continue;
       seen.add(key); deduped.push({...x,url:key});
     }
-    const domains=[...new Set(deduped.map(x=>x.domain).filter(Boolean))];
+
+    // Deliberately protect space for the kind of evidence Care Wisdom is built around:
+    // firsthand caregiver/patient discussions. Clinical sources are then used as a check,
+    // not allowed to crowd the lived-experience pool out of the result set.
+    const community=deduped.filter(x=>x.type==="community");
+    const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
+    const other=deduped.filter(x=>x.type==="journalism"||x.type==="other");
+    const selected=diversifyByDomain([...community,...clinical,...other],18);
+
+    const domains=[...new Set(selected.map(x=>x.domain).filter(Boolean))];
 
     return res.status(200).json({
       question:q,
       research_branches:buildBranches(q),
-      sources:deduped.slice(0,30),
-      source_stats:{total:deduped.length,independent_domains:domains.length,domains},
+      sources:selected,
+      source_stats:{
+        total:selected.length,
+        independent_domains:domains.length,
+        lived_experience_sources:community.length,
+        selected_lived_experience_sources:selected.filter(x=>x.type==="community").length,
+        domains
+      },
       search_queries:queries
     });
   }catch(e){
@@ -53,10 +68,14 @@ export default async function handler(req,res){
 function buildQueries(q){
   return [
     q,
-    q+" caregiver patient experience what helped",
-    q+" Parkinson's rehabilitation physical therapy caregiver",
+    q+" Parkinson's caregiver firsthand experience what helped",
+    "site:agingcare.com Parkinson's physical therapy rehabilitation caregiver experience",
+    "site:reddit.com/r/Parkinsons Parkinson's physical therapy rehabilitation progress caregiver",
+    "site:myparkinsons.org Parkinson's caregiver forum physical therapy rehabilitation",
+    "Parkinson's caregiver forum rehabilitation stalled progress physical therapy",
     q+" Parkinson's orthostatic hypotension medication timing fatigue rehabilitation",
-    q+" nursing home skilled nursing rehabilitation Parkinson's caregiver experience"
+    q+" Parkinson's physical therapy clinical guideline systematic review",
+    "Parkinson's rehabilitation nursing home caregiver experience"
   ].map(x=>x.slice(0,240));
 }
 function buildBranches(q){
@@ -97,4 +116,22 @@ function guessType(url,title){
   if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|neuropt\.org|apta\.org|\.edu\//.test(h))return "clinical";
   if(/reuters|nytimes|washingtonpost|aarp|statnews|npr\.org/.test(h))return "journalism";
   return "other";
+}
+
+
+function diversifyByDomain(items,max){
+  const out=[],used=new Set();
+  // First pass: one result per domain, preserving the evidence-class priority above.
+  for(const x of items){
+    if(out.length>=max)break;
+    if(!x.domain||used.has(x.domain))continue;
+    used.add(x.domain);out.push(x);
+  }
+  // Second pass: fill remaining slots when a domain has multiple genuinely useful pages.
+  for(const x of items){
+    if(out.length>=max)break;
+    if(out.some(y=>canonical(y.url)===canonical(x.url)))continue;
+    out.push(x);
+  }
+  return out;
 }
