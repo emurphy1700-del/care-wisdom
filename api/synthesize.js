@@ -76,27 +76,30 @@ if(!result||typeof result!=="object"){
     safety_flags:[]
   };
 }
-  // Deterministic evidence guard: the model cannot promote a pattern to lived/mixed
-  // experience unless its own evidence trail contains at least two experiential
-  // source domains. This prevents clinical pages from being counted as caregiver reports.
-  const sourceByUrl=new Map(sources.map(s=>[String(s.url||""),s]));
-  const experientialTypes=new Set(["community","journalism"]);
-  const promotedSingleReports=[];
-  result.patterns=(Array.isArray(result.patterns)?result.patterns:[]).filter(p=>{
-    const trail=Array.isArray(p.evidence_trail)?p.evidence_trail:[];
-    const exp=trail.map(t=>sourceByUrl.get(String(t.url||""))||t)
-      .filter(s=>experientialTypes.has(s.type));
-    const expDomains=[...new Set(exp.map(s=>s.domain).filter(Boolean))];
-    if((p.category==="lived_experience"||p.category==="mixed") && expDomains.length<2){
-      const title=String(p.title||"");
-      promotedSingleReports.push(`The research surfaced "${title}" but did not find enough distinct experiential source domains to call it a recurring lived-experience pattern.`);
-      return false;
+  // Deterministic evidence guard: clinical pages cannot count as firsthand experience.
+  // Keep this block deliberately defensive so a malformed model record cannot cause a 500.
+  try {
+    const sourceByUrl=new Map(sources.map(s=>[String(s.url||""),s]));
+    const experientialTypes=new Set(["community","journalism"]);
+    const promotedSingleReports=[];
+    result.patterns=(Array.isArray(result.patterns)?result.patterns:[]).filter(p=>{
+      const trail=Array.isArray(p.evidence_trail)?p.evidence_trail:[];
+      const exp=trail.map(t=>sourceByUrl.get(String(t.url||""))||t)
+        .filter(s=>experientialTypes.has(s.type));
+      const expDomains=[...new Set(exp.map(s=>s.domain).filter(Boolean))];
+      if((p.category==="lived_experience"||p.category==="mixed") && expDomains.length<2){
+        const title=String(p.title||"");
+        promotedSingleReports.push("The research surfaced \"" + title + "\" but did not find enough distinct experiential source domains to call it a recurring lived-experience pattern.");
+        return false;
+      }
+      return true;
+    });
+    if(promotedSingleReports.length){
+      result.single_reports=[...(Array.isArray(result.single_reports)?result.single_reports:[]),...promotedSingleReports];
+      result.limitations=[...(Array.isArray(result.limitations)?result.limitations:[]),"Lived-experience evidence was thinner than the clinical evidence for some findings; source-domain diversity was not treated as proof of independent people."];
     }
-    return true;
-  });
-  if(promotedSingleReports.length){
-    result.single_reports=[...(Array.isArray(result.single_reports)?result.single_reports:[]),...promotedSingleReports];
-    result.limitations=[...(Array.isArray(result.limitations)?result.limitations:[]),"Lived-experience evidence was thinner than the clinical evidence for some findings; source-domain diversity was not treated as proof of independent people."];
+  } catch (guardError) {
+    result.limitations=[...(Array.isArray(result.limitations)?result.limitations:[]),"The evidence-diversity check could not be completed; the underlying source trail is still shown for review."];
   }
   // Normalize the evidence boundary after synthesis so the UI cannot accidentally
   // present clinical material as firsthand experience.
