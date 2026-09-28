@@ -116,6 +116,9 @@ export default async function handler(req,res){
         independent_domains:domains.length,
         lived_experience_sources:community.length,
         selected_lived_experience_sources:selected.filter(x=>x.type==="community").length,
+        reddit_sources:selected.filter(x=>x.domain==="reddit.com").length,
+        aarp_sources:selected.filter(x=>x.domain==="aarp.org").length,
+        public_sources:selected.filter(x=>x.type==="journalism").length,
         domains
       },
       search_queries:queries
