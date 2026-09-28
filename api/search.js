@@ -1,4 +1,4 @@
-export const maxDuration = 60;
+export const maxDuration = 10;
 
 const OUTPUT_SCHEMA = {
   type: "json",
@@ -42,40 +42,59 @@ const OUTPUT_SCHEMA = {
 };
 
 export default async function handler(req,res){
-  if(req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
-  const q=String(req.body?.query||"").trim();
-  if(!q) return res.status(400).json({error:"Query required"});
+  if(req.method!=="POST" && req.method!=="GET") return res.status(405).json({error:"Method not allowed"});
   if(!process.env.PARALLEL_API_KEY) return res.status(503).json({error:"Live search provider credential is not configured on the server"});
 
   try{
-    const runResp=await fetch("https://api.parallel.ai/v1/tasks/runs",{
-      method:"POST",
-      headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},
-      body:JSON.stringify({
-        processor:"base",
-        input:researchPrompt(q),
-        task_spec:{output_schema:OUTPUT_SCHEMA}
-      })
-    });
-    const runRaw=await runResp.text();
-    let runData; try{runData=JSON.parse(runRaw)}catch{
-      return res.status(502).json({error:"Research provider returned a non-JSON task response",detail:runRaw.slice(0,700)});
+    if(req.method==="POST"){
+      const q=String(req.body?.query||"").trim();
+      if(!q) return res.status(400).json({error:"Query required"});
+      const runResp=await fetch("https://api.parallel.ai/v1/tasks/runs",{
+        method:"POST",
+        headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({
+          processor:"base",
+          input:researchPrompt(q),
+          task_spec:{output_schema:OUTPUT_SCHEMA}
+        })
+      });
+      const runRaw=await runResp.text();
+      let runData; try{runData=JSON.parse(runRaw)}catch{
+        return res.status(502).json({error:"Research provider returned a non-JSON task response",detail:runRaw.slice(0,700)});
+      }
+      if(!runResp.ok) return res.status(502).json({error:"Research provider rejected the task",detail:runData?.error?.message||runData?.message||runRaw.slice(0,700)});
+      const runId=runData.run_id||runData.id||runData.run?.run_id;
+      if(!runId) return res.status(502).json({error:"Research provider did not return a task ID"});
+      return res.status(202).json({runId,status:runData.status||runData.run?.status||"queued",question:q});
     }
-    if(!runResp.ok) return res.status(502).json({error:"Research provider rejected the task",detail:runData?.error?.message||runData?.message||runRaw.slice(0,700)});
-    const runId=runData.run_id||runData.id;
-    if(!runId) return res.status(502).json({error:"Research provider did not return a task ID"});
 
-    const resultResp=await fetch("https://api.parallel.ai/v1/tasks/runs/"+encodeURIComponent(runId)+"/result",{
+    const runId=String(req.query?.runId||"").trim();
+    if(!runId) return res.status(400).json({error:"runId required"});
+
+    const statusResp=await fetch("https://api.parallel.ai/v1/tasks/runs/"+encodeURIComponent(runId),{
+      headers:{"x-api-key":process.env.PARALLEL_API_KEY}
+    });
+    const statusRaw=await statusResp.text();
+    let statusData; try{statusData=JSON.parse(statusRaw)}catch{
+      return res.status(502).json({error:"Research provider returned a non-JSON status response",detail:statusRaw.slice(0,700)});
+    }
+    if(!statusResp.ok) return res.status(502).json({error:"Could not check research task",detail:statusData?.error?.message||statusData?.message||statusRaw.slice(0,700)});
+
+    const run=statusData.run||statusData;
+    const status=run.status||statusData.status||"unknown";
+    if(status==="queued"||status==="running") return res.status(200).json({status,runId});
+    if(status==="failed") return res.status(200).json({status:"failed",runId,error:run.errors||run.error||"Research task failed"});
+    if(status!=="completed") return res.status(200).json({status,runId});
+
+    const resultResp=await fetch("https://api.parallel.ai/v1/tasks/runs/"+encodeURIComponent(runId)+"/result?timeout=5",{
       headers:{"x-api-key":process.env.PARALLEL_API_KEY}
     });
     const resultRaw=await resultResp.text();
     let resultData; try{resultData=JSON.parse(resultRaw)}catch{
       return res.status(502).json({error:"Research result was not valid JSON",detail:resultRaw.slice(0,700)});
     }
-    if(!resultResp.ok) return res.status(502).json({error:"Research task did not complete successfully",detail:resultData?.error?.message||resultData?.message||resultRaw.slice(0,700)});
-
-    const result=normalizeResult(resultData,q);
-    return res.status(200).json(result);
+    if(!resultResp.ok) return res.status(502).json({error:"Research task result could not be retrieved",detail:resultData?.error?.message||resultData?.message||resultRaw.slice(0,700)});
+    return res.status(200).json(normalizeResult(resultData,run.input?.query||""));
   }catch(e){
     return res.status(500).json({error:"Research failed",detail:String(e).slice(0,700)});
   }
