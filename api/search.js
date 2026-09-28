@@ -8,17 +8,22 @@ export default async function handler(req,res){
     if(!q) return res.status(400).json({error:"Query required"});
 
     const queries=buildQueries(q);
-    async function providerSearch(objective, search_queries, max_results){
+    async function providerSearch(objective, search_queries, max_results, include_domains){
       const response=await fetch("https://api.parallel.ai/v1/search",{
         method:"POST",
         headers:{
-          "Authorization":"Bearer "+process.env.PARALLEL_API_KEY,
+          "x-api-key":process.env.PARALLEL_API_KEY,
           "Content-Type":"application/json"
         },
         body:JSON.stringify({
           objective,
-          search_queries,
-          advanced_settings:{max_results}
+          search_queries:search_queries.slice(0,3),
+          mode:"advanced",
+          client_model:"gpt-5.6",
+          advanced_settings:{
+            max_results,
+            ...(include_domains?.length?{source_policy:{include_domains}}:{})
+          }
         })
       });
       const raw=await response.text();
@@ -32,50 +37,60 @@ export default async function handler(req,res){
 
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
-    const communityQueries=queries.filter(x=>/site:agingcare|site:reddit|site:myparkinsons|forum|caregiver experience|firsthand/i.test(x));
-    const clinicalQueries=queries.filter(x=>/clinical|systematic review|orthostatic|medication timing/i.test(x));
+    const communityQueries=[
+      "Parkinson's rehab stalled progress",
+      "Parkinson's caregiver PT experience",
+      "Parkinson's rehabilitation what helped"
+    ];
+    const clinicalQueries=[
+      "Parkinson's PT rehabilitation evidence",
+      "Parkinson's rehab deconditioning",
+      "Parkinson's orthostatic hypotension rehabilitation"
+    ];
     const publicQueries=[
-      q+" caregiver experience Parkinson's AARP",
-      q+" Parkinson's caregiver experience Reddit",
-      q+" Parkinson's caregiver story NPR AARP patient experience",
-      q+" Parkinson's rehabilitation patient caregiver discussion forum"
+      "Parkinson's caregiver rehabilitation AARP",
+      "Parkinson's PT caregiver story",
+      "Parkinson's rehabilitation patient experience"
     ];
 
     const searches=[
       providerSearch(
         "Find FIRSTHAND patient or caregiver discussions about the specific caregiving problem. Prioritize discussion threads and Q&A where an individual describes what happened, what was tried, and what the outcome was. Prefer AgingCare, Reddit Parkinson's communities, Parkinson's forums, and other patient/caregiver discussion communities. Do NOT return general medical guides, clinic marketing, or generic educational pages unless needed as a last resort.",
-        communityQueries.length?communityQueries:[q+" caregiver firsthand experience"],
-        12
+        communityQueries,
+        18,
+        ["agingcare.com","reddit.com","myparkinsons.org","parkinsonssupport","parkinsonsforum.com"]
       ),
       providerSearch(
         "Find high-quality clinical evidence and patient-organization guidance relevant to the question. Prioritize systematic reviews, clinical practice guidelines, PubMed/NIH, major academic medical centers, Parkinson's Foundation, and Movement Disorder Society. This is the verification/context layer, not the lived-experience layer.",
-        clinicalQueries.length?clinicalQueries:[q+" clinical evidence"],
-        12
+        clinicalQueries,
+        18,
+        ["pubmed.ncbi.nlm.nih.gov","pmc.ncbi.nlm.nih.gov","nih.gov","parkinson.org","movementdisorders.org","neuropt.org","apta.org",".edu"]
       ),
       providerSearch(
         "Find broader public-facing reporting and firsthand discussion relevant to the caregiving question. Include reputable general-public sources such as AARP, NPR, major newspapers or magazines, and Reddit patient/caregiver discussions when relevant. Prefer articles or threads that contain concrete experiences, practical observations, or caregiver perspectives. Do not substitute generic clinic marketing for firsthand experience.",
         publicQueries,
-        10
+        18,
+        ["aarp.org","npr.org","reuters.com","apnews.com","nytimes.com","washingtonpost.com","usatoday.com"]
       ),
       providerSearch(
         "Return ONLY individual Reddit discussion pages from reddit.com relevant to this question. Prefer r/Parkinsons and r/ParkinsonsCaregivers. Look for people describing actual experiences with PT, rehabilitation, weakness, mobility, caregiving, falls, or stalled progress. Do not return subreddit landing pages or generic medical pages.",
         [
-          "site:reddit.com/r/Parkinsons "+q,
-          "site:reddit.com/r/ParkinsonsCaregivers "+q,
-          'site:reddit.com/r/Parkinsons "physical therapy" Parkinson\'s',
-          'site:reddit.com/r/ParkinsonsCaregivers rehabilitation Parkinson\'s'
+          "Parkinson's PT stalled progress",
+          "Parkinson's rehab caregiver experience",
+          "Parkinson's physical therapy problems"
         ],
-        6
+        10,
+        ["reddit.com"]
       ),
       providerSearch(
         "Return ONLY AARP articles relevant to this caregiving question, preferably firsthand caregiver stories or practical reporting about Parkinson's, rehabilitation, physical therapy, hospital-to-rehab transitions, mobility, or caregiving. Do not return non-AARP pages.",
         [
-          "site:aarp.org/caregiving Parkinson's rehabilitation caregiver",
-          "site:aarp.org/caregiving Parkinson's physical therapy caregiver",
-          "site:aarp.org/caregiving hospital rehab Parkinson's caregiver",
-          "site:aarp.org/caregiving mobility Parkinson's caregiver"
+          "Parkinson's caregiver rehabilitation",
+          "Parkinson's physical therapy caregiver",
+          "Parkinson's mobility caregiving"
         ],
-        6
+        10,
+        ["aarp.org"]
       )
     ];
     const settled=await Promise.allSettled(searches);
@@ -106,6 +121,42 @@ export default async function handler(req,res){
       ...other,
       ...clinical
     ],18);
+
+    // Second stage: extract the relevant passages from the actual pages.
+    // Search snippets are often too shallow to tell a useful caregiver story from a generic guide.
+    const urls=selected.map(x=>x.url).slice(0,20);
+    let extracted=[];
+    if(urls.length){
+      try{
+        const er=await fetch("https://api.parallel.ai/v1/extract",{
+          method:"POST",
+          headers:{
+            "x-api-key":process.env.PARALLEL_API_KEY,
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            urls,
+            objective:"Extract passages that directly answer this caregiving question: what happened to the patient or caregiver, what barrier or problem was observed, what was tried, what happened afterward, and any disagreement or uncertainty. For clinical sources, extract the specific evidence or guidance relevant to the barrier. Ignore navigation, marketing, generic disease definitions, and unrelated material.",
+            search_queries:["PT progress barriers","caregiver experience","rehab what helped"],
+            client_model:"gpt-5.6",
+            advanced_settings:{excerpt_settings:{max_chars_per_result:1800}}
+          })
+        });
+        const eraw=await er.text();
+        if(er.ok){
+          const ed=JSON.parse(eraw);
+          extracted=Array.isArray(ed.results)?ed.results:[];
+        }
+      }catch{}
+    }
+    const extractedByUrl=new Map(extracted.map(x=>[canonical(x.url),x]));
+    for(const s of selected){
+      const e=extractedByUrl.get(canonical(s.url));
+      if(e){
+        s.excerpts=(e.excerpts||s.excerpts||[]).slice(0,4).map(String);
+        s.extracted=true;
+      }
+    }
 
     const domains=[...new Set(selected.map(x=>x.domain).filter(Boolean))];
 
