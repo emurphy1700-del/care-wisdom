@@ -41,31 +41,31 @@ export default async function handler(req,res){
       q+" Parkinson's rehabilitation patient caregiver discussion forum"
     ];
 
-    const [communityResults,clinicalResults,generalResults,redditResults,aarpResults]=await Promise.all([
+    const searches=[
       providerSearch(
         "Find FIRSTHAND patient or caregiver discussions about the specific caregiving problem. Prioritize discussion threads and Q&A where an individual describes what happened, what was tried, and what the outcome was. Prefer AgingCare, Reddit Parkinson's communities, Parkinson's forums, and other patient/caregiver discussion communities. Do NOT return general medical guides, clinic marketing, or generic educational pages unless needed as a last resort.",
         communityQueries.length?communityQueries:[q+" caregiver firsthand experience"],
-        16
+        12
       ),
       providerSearch(
         "Find high-quality clinical evidence and patient-organization guidance relevant to the question. Prioritize systematic reviews, clinical practice guidelines, PubMed/NIH, major academic medical centers, Parkinson's Foundation, and Movement Disorder Society. This is the verification/context layer, not the lived-experience layer.",
         clinicalQueries.length?clinicalQueries:[q+" clinical evidence"],
-        16
+        12
       ),
       providerSearch(
         "Find broader public-facing reporting and firsthand discussion relevant to the caregiving question. Include reputable general-public sources such as AARP, NPR, major newspapers or magazines, and Reddit patient/caregiver discussions when relevant. Prefer articles or threads that contain concrete experiences, practical observations, or caregiver perspectives. Do not substitute generic clinic marketing for firsthand experience.",
         publicQueries,
-        14
+        10
       ),
       providerSearch(
         "Return ONLY individual Reddit discussion pages from reddit.com relevant to this question. Prefer r/Parkinsons and r/ParkinsonsCaregivers. Look for people describing actual experiences with PT, rehabilitation, weakness, mobility, caregiving, falls, or stalled progress. Do not return subreddit landing pages or generic medical pages.",
         [
           "site:reddit.com/r/Parkinsons "+q,
           "site:reddit.com/r/ParkinsonsCaregivers "+q,
-          "site:reddit.com/r/Parkinsons "physical therapy" Parkinson's",
-          "site:reddit.com/r/ParkinsonsCaregivers rehabilitation Parkinson's"
+          'site:reddit.com/r/Parkinsons "physical therapy" Parkinson\'s',
+          'site:reddit.com/r/ParkinsonsCaregivers rehabilitation Parkinson\'s'
         ],
-        8
+        6
       ),
       providerSearch(
         "Return ONLY AARP articles relevant to this caregiving question, preferably firsthand caregiver stories or practical reporting about Parkinson's, rehabilitation, physical therapy, hospital-to-rehab transitions, mobility, or caregiving. Do not return non-AARP pages.",
@@ -75,11 +75,13 @@ export default async function handler(req,res){
           "site:aarp.org/caregiving hospital rehab Parkinson's caregiver",
           "site:aarp.org/caregiving mobility Parkinson's caregiver"
         ],
-        8
+        6
       )
-    ]);
-
-    const results=[...redditResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
+    ];
+    const settled=await Promise.allSettled(searches);
+    const [communityResults,clinicalResults,generalResults,redditResults,aarpResults]=settled.map(x=>x.status==="fulfilled"?x.value:[]);
+    const searchFailures=settled.filter(x=>x.status==="rejected").length;
+        const results=[...redditResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
     const deduped=[]; const seen=new Set();
     for(const x of results){
       const key=canonical(x.url);
@@ -119,7 +121,8 @@ export default async function handler(req,res){
         reddit_sources:selected.filter(x=>x.domain==="reddit.com").length,
         aarp_sources:selected.filter(x=>x.domain==="aarp.org").length,
         public_sources:selected.filter(x=>x.type==="journalism").length,
-        domains
+        domains,
+        search_failures:searchFailures
       },
       search_queries:queries
     });
