@@ -22,7 +22,22 @@ Produce no more than 4 strong patterns. A pattern must be an underlying recurrin
   const raw=await r.text();let d;try{d=JSON.parse(raw)}catch{return res.status(502).json({error:"Synthesis provider returned non-JSON",detail:raw.slice(0,700)})}
   if(!r.ok)return res.status(502).json({error:"Synthesis provider rejected request",detail:d?.error?.message||d?.message||raw.slice(0,700)});
   const text=d?.output_text||((d?.output||[]).flatMap(x=>[x?.text,...(x?.content||[]).map(y=>y?.text)]).find(Boolean)||"");
-  let result;try{result=JSON.parse(String(text).replace(/^\s*\`\`\`json\s*/,"").replace(/\s*\`\`\`\s*$/,""))}catch{return res.status(502).json({error:"Synthesis was not valid JSON",detail:String(text).slice(0,700)})}
+  let result;
+const cleaned=String(text).replace(/^\\s*\\\`\\\`\\\`(?:json)?\\s*/,"").replace(/\\s*\\\`\\\`\\\`\\s*$/,"").trim();
+try{result=JSON.parse(cleaned)}
+catch{
+  const a=cleaned.indexOf("{"),b=cleaned.lastIndexOf("}");
+  if(a>=0&&b>a){try{result=JSON.parse(cleaned.slice(a,b+1))}catch{}}
+}
+if(!result||typeof result!=="object"){
+  result={
+    question:q,
+    overview:cleaned,
+    patterns:[],
+    limitations:["The research model returned a narrative synthesis rather than structured evidence. No unsupported claims were converted into patterns."],
+    safety_flags:[]
+  };
+}
   const domains=[...new Set(sources.map(s=>s.domain).filter(Boolean))];
   return res.status(200).json({...result,question:result.question||q,sources,source_stats:{total:sources.length,independent_domains:domains.length,lived_experience_sources:sources.filter(s=>s.type==="community").length,domains}});
  }catch(e){return res.status(500).json({error:"Synthesis failed",detail:String(e).slice(0,700)})}
