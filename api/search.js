@@ -33,9 +33,12 @@ export default async function handler(req,res){
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
     const communityQueries=[
-      q+" caregiver rehabilitation experience",
-      q+" patient caregiver physical therapy what helped",
-      "site:agingcare.com "+q+" rehabilitation"
+      q+" caregiver experience what helped",
+      q+" patient caregiver forum what helped",
+      "site:agingcare.com/questions "+q,
+      "site:reddit.com/r/Parkinsons "+q,
+      "site:reddit.com/r/ParkinsonsCaregivers "+q,
+      q+" freezing standing from chair caregiver"
     ];
     const clinicalQueries=[
       q+" clinical evidence rehabilitation",
@@ -69,7 +72,8 @@ export default async function handler(req,res){
         [
           "site:reddit.com/r/Parkinsons "+q,
           "site:reddit.com/r/ParkinsonsCaregivers "+q,
-          "site:reddit.com/r/Parkinsons physical therapy rehabilitation"
+          "site:reddit.com/r/Parkinsons \"freezing\" \"chair\"",
+          "site:reddit.com/r/ParkinsonsCaregivers \"freezing\" \"chair\""
         ],
         10,
         ["reddit.com"]
@@ -99,18 +103,19 @@ export default async function handler(req,res){
     // Deliberately protect space for the kind of evidence Care Wisdom is built around:
     // firsthand caregiver/patient discussions. Clinical sources are then used as a check,
     // not allowed to crowd the lived-experience pool out of the result set.
-    const community=deduped.filter(x=>x.type==="community");
+    const community=deduped.filter(x=>x.type==="community" && isUsefulFirsthand(x));
     const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
-    const other=deduped.filter(x=>x.type==="journalism"||x.type==="other");
-    // Keep the lived-experience layer visible even when the provider returns many
-    // clinical pages. Up to 10 community sources, then clinical verification, then other context.
-    const reddit=deduped.filter(x=>x.domain==="reddit.com");
-    const aarp=deduped.filter(x=>x.domain==="aarp.org");
+    const journalism=deduped.filter(x=>x.type==="journalism" && isUsefulPublicReporting(x));
+    // Never pad the evidence pool with navigation pages, directories, event pages,
+    // generic topic hubs, or unrelated "other" results. Care Wisdom would rather
+    // return 9 good sources than 18 impressive-looking but irrelevant ones.
+    const reddit=community.filter(x=>x.domain==="reddit.com");
+    const aarp=journalism.filter(x=>x.domain==="aarp.org");
     const selected=diversifyByDomain([
       ...reddit,
-      ...aarp,
       ...community,
-      ...other,
+      ...aarp,
+      ...journalism,
       ...clinical
     ],18);
 
@@ -215,6 +220,18 @@ function normalizeResult(x){
 }
 function canonical(u){try{const x=new URL(u);["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","mc_cid","mc_eid"].forEach(k=>x.searchParams.delete(k));x.hash="";return x.origin+x.pathname.replace(/\/$/,"")}catch{return ""}}
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
+function isUsefulFirsthand(x){
+  const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
+  const bad=/(^|\.)support\.zoom\.com|eventbrite|wikipedia\.org|dictionary|glossary|directory|webinar|workshop|landing|\/topics?\/|\/caregiving-information|\/carepartner|\/resources-support\/carepartners\/pointers|\/caregiver-forum$|\/caregiver-forum\/discussions\?/.test(h);
+  if(bad)return false;
+  if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\//.test(String(x.url||""));
+  if(x.domain==="agingcare.com") return /\/questions\/[^/]+\.htm/.test(String(x.url||""));
+  return /(forum|question|discussion|caregiver|patient|my (mom|dad|mother|father|husband|wife)|we found|i found|in my experience|what helped|tried)/.test(h);
+}
+function isUsefulPublicReporting(x){
+  const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
+  return !/(directory|eventbrite|webinar|workshop|support\.zoom|wikipedia)/.test(h);
+}
 function guessType(url,title){
   const h=(url+" "+title).toLowerCase();
   if(/agingcare\.com|reddit\.com|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
