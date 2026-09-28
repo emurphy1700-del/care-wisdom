@@ -34,7 +34,12 @@ export default async function handler(req,res){
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
     const communityQueries=queries.filter(x=>/site:agingcare|site:reddit|site:myparkinsons|forum|caregiver experience|firsthand/i.test(x));
     const clinicalQueries=queries.filter(x=>/clinical|systematic review|orthostatic|medication timing/i.test(x));
-    const generalQueries=[q+" Parkinson's caregiver patient experience rehabilitation",q+" Parkinson's physical therapy progress barriers"];
+    const publicQueries=[
+      q+" caregiver experience Parkinson's AARP",
+      q+" Parkinson's caregiver experience Reddit",
+      q+" Parkinson's caregiver story NPR AARP patient experience",
+      q+" Parkinson's rehabilitation patient caregiver discussion forum"
+    ];
 
     const [communityResults,clinicalResults,generalResults]=await Promise.all([
       providerSearch(
@@ -48,23 +53,13 @@ export default async function handler(req,res){
         16
       ),
       providerSearch(
-        "Find useful sources for the caregiving question, with preference for independent patient/caregiver reporting and reputable clinical context. Avoid filling the results with multiple generic physical therapy pages from the same type of publisher.",
-        generalQueries,
-        12
+        "Find broader public-facing reporting and firsthand discussion relevant to the caregiving question. Include reputable general-public sources such as AARP, NPR, major newspapers or magazines, and Reddit patient/caregiver discussions when relevant. Prefer articles or threads that contain concrete experiences, practical observations, or caregiver perspectives. Do not substitute generic clinic marketing for firsthand experience.",
+        publicQueries,
+        14
       )
     ]);
 
     const results=[...communityResults,...clinicalResults,...generalResults].map(normalizeResult).filter(x=>x.url);
-    const raw=await response.text();
-    let data;
-    try{data=JSON.parse(raw)}catch{
-      return res.status(502).json({error:"Research provider returned a non-JSON response",detail:raw.slice(0,900)});
-    }
-    if(!response.ok){
-      return res.status(502).json({error:"Research provider rejected the request",detail:data?.error?.message||data?.message||raw.slice(0,900)});
-    }
-
-    const results=extractResults(data).map(normalizeResult).filter(x=>x.url);
     const deduped=[]; const seen=new Set();
     for(const x of results){
       const key=canonical(x.url);
@@ -81,10 +76,10 @@ export default async function handler(req,res){
     // Keep the lived-experience layer visible even when the provider returns many
     // clinical pages. Up to 10 community sources, then clinical verification, then other context.
     const selected=diversifyByDomain([
-      ...community.slice(0,10),
-      ...clinical,
+      ...community.slice(0,8),
       ...other,
-      ...community.slice(10)
+      ...clinical,
+      ...community.slice(8)
     ],18);
 
     const domains=[...new Set(selected.map(x=>x.domain).filter(Boolean))];
@@ -156,7 +151,7 @@ function guessType(url,title){
   if(/agingcare\.com|reddit\.com|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
   if(/parkinson\.org|lbda|movementdisorders\.org/.test(h))return "patient_org";
   if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|neuropt\.org|apta\.org|\.edu\//.test(h))return "clinical";
-  if(/reuters|nytimes|washingtonpost|aarp|statnews|npr\.org/.test(h))return "journalism";
+  if(/reuters|nytimes|washingtonpost|aarp|statnews|npr\.org|apnews|bbc|theatlantic|time\.com|usatoday|forbes|bloomberg/.test(h))return "journalism";
   return "other";
 }
 
