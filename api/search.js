@@ -57,7 +57,7 @@ export default async function handler(req,res){
       },
       body:JSON.stringify({
         model:"parallel",
-        reasoning:{effort:"medium"},
+        reasoning:{effort:"low"},
         instructions:researchInstructions(),
         input:q,
         text:{
@@ -132,7 +132,7 @@ mixed_conflicting = credible sources materially disagree
 too_thin = insufficient evidence for a meaningful pattern
 The rationale must explain the actual source mix. This is not a treatment recommendation or score.
 
-FOR EACH PATTERN:
+FOR EACH PATTERN (produce no more than 4 strong patterns; fewer is better than weak ones):
 - What people reported: summarize actual patient/caregiver experiences; distinguish repeated from isolated reports.
 - Evidence check: summarize clinical evidence and limitations.
 - Disagreement: identify real disagreement or say when little disagreement was found.
