@@ -55,6 +55,9 @@ async function search(){
   $('results').innerHTML='<div class="empty">'+esc(e.message)+'</div>';
  }
 }
+$('searchBtn').addEventListener('click',search);
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search();}});
+
 async function loadNotes(){const {data:{user}}=await sb.auth.getUser();if(!user){$('authBox').classList.remove('hidden');$('notebookBox').classList.add('hidden');return}$('authBox').classList.add('hidden');$('notebookBox').classList.remove('hidden');$('userEmail').textContent=user.email||'Signed in';const {data,error}=await sb.from('notebook_entries').select('*').order('occurred_at',{ascending:false}).order('created_at',{ascending:false});if(error){$('notes').innerHTML=`<p class="small muted">Could not load notebook: ${esc(error.message)}</p>`;return}$('notes').innerHTML=(data||[]).map(n=>`<div class="note"><b>${esc(n.title||'Untitled')}</b><div class="small muted">${esc(n.entry_type||'note')} · ${new Date(n.created_at).toLocaleString()}</div><p>${esc(n.body)}</p>${(n.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</div>`).join('')||'<p class="muted">No entries yet.</p>'}
 $('signUp').onclick=async()=>{const {error}=await sb.auth.signUp({email:$('email').value,password:$('password').value});$('authMsg').textContent=error?error.message:'Account created. Check your email if confirmation is enabled.';if(!error)loadNotes()};
 $('signIn').onclick=async()=>{const {error}=await sb.auth.signInWithPassword({email:$('email').value,password:$('password').value});$('authMsg').textContent=error?error.message:'';if(!error)loadNotes()};
