@@ -6,7 +6,7 @@ export default async function handler(req,res){
  try{
   const r=await fetch('https://api.parallel.ai/v1/search',{method:'POST',headers:{'x-api-key':process.env.PARALLEL_API_KEY,'content-type':'application/json'},body:JSON.stringify({
    objective:'Research a caregiving or health question for a research companion. Search broadly but deliberately. Use community/patient/caregiver sources to discover lived experience and practical problems; use authoritative clinical sources separately for medical context. Prefer independent sources and preserve disagreement. Do not diagnose, prescribe, rank treatments, or treat anecdotes as medical conclusions. Return source URLs, titles, and useful excerpts.',
-   search_queries:queries.map(x=>x.slice(0,200)), mode:'fast'
+   search_queries:queries.map(x=>x.slice(0,200)), max_results:20
   })});
   const rawResponse=await r.text(); let data; try{data=JSON.parse(rawResponse)}catch{return res.status(502).json({error:'Search provider returned a non-JSON response',detail:rawResponse.slice(0,500)})} if(!r.ok)return res.status(502).json({error:'Search provider error',detail:data?.error?.message||data?.message||'Provider rejected the request'});
   const raw=(data.results||[]).map(x=>({url:x.url,title:x.title||x.url,excerpts:Array.isArray(x.excerpts)?x.excerpts:[],text:x.text||x.content||''}));
