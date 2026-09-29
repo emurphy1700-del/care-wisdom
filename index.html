@@ -11,7 +11,7 @@ header{background:var(--ink);color:#fff;padding:42px max(22px,6vw) 48px}.brand{f
 .search{display:flex;gap:10px;margin-top:25px;align-items:flex-end}.searchbox{flex:1;min-width:0}.search textarea{width:100%;min-height:58px;max-height:360px;overflow-y:auto;padding:17px 18px;border:0;border-radius:12px;font-size:16px;font:inherit;line-height:1.45;resize:none;display:block}.query-meta{display:flex;justify-content:flex-end;margin-top:5px;padding-right:3px;color:#b9c9d2;font-size:12px}.query-meta.near-limit{color:#f4d9d5}.search .btn{height:58px}.btn{border:0;border-radius:12px;padding:0 20px;font-weight:800;cursor:pointer}.primary{background:var(--sage);color:#17372e}.secondary{background:#eef3f5;color:var(--ink);padding:10px 14px}.search .btn{background:var(--sage);color:#17372e}
 main{max-width:1120px;margin:28px auto;padding:0 20px}.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);gap:20px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 2px 8px #1832470b}.card h2,.card h3{margin-top:0}.muted{color:var(--muted);font-size:14px}.status{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.pattern{border-top:1px solid var(--line);padding:22px 0}.pattern:first-child{border-top:0}.eyebrow{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#527082}.pattern h3{font-size:21px;margin:5px 0 8px}.pill{display:inline-block;background:var(--blue);border-radius:999px;padding:4px 9px;font-size:11px;margin:0 5px 5px 0}.pill.gold{background:var(--gold)}.pill.red{background:var(--red)}.evidence-profile{display:flex;align-items:flex-start;gap:10px;background:#f7f8f8;border-radius:12px;padding:13px;margin:12px 0}.evidence-dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;margin-top:4px}.evidence-dot.strong{background:#6c9b7b}.evidence-dot.limited{background:#c7a64b}.evidence-dot.clinical{background:#6d8fb0}.evidence-dot.mixed{background:#b57972}.evidence-dot.thin{background:#8b9297}.evidence-profile b{display:block;margin-bottom:2px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.mini{background:#f7f8f8;border-radius:12px;padding:13px}.mini b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}.sources{margin-top:12px}.source{padding:9px 0;border-top:1px solid #edf0f1}.source a{color:#245a78;text-decoration:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.danger{background:#fff3f0;border-color:#efd3cd}.note-form textarea,.note-form input,.auth input{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit}.note-form textarea{min-height:110px;resize:vertical}.note{padding:13px 0;border-top:1px solid var(--line)}.note:first-child{border-top:0}.authrow{display:flex;gap:8px}.authrow input{flex:1}.small{font-size:12px}.evidence-note{background:#f5f7f7;border-radius:12px;padding:13px;margin:12px 0}.source-breakdown{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.hidden{display:none!important}.empty{padding:28px 0;color:var(--muted)}
 @media(max-width:800px){.layout{grid-template-columns:1fr}.search{flex-direction:column}.search .btn{height:50px}.grid2{grid-template-columns:1fr}}
-</style></head>
+.thread-context{background:#eef3f5;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.thread-context b{color:#527082;text-transform:uppercase;letter-spacing:.07em;font-size:11px}.thread-context span{color:var(--muted)}</style></head>
 <body>
 <header><div class="hero"><div class="brand">CARE WISDOM</div><h1>Practical experience, turned into better questions.</h1><p>Find recurring caregiver and patient experiences, then separate them from clinical context and uncertainty. Anecdotes are discovery evidence — not medical advice.</p>
 <div class="search"><div class="searchbox"><textarea id="q" aria-label="Research question" maxlength="20000" rows="2">Parkinson's toileting assistance with Hoyer lift</textarea><div id="queryMeta" class="query-meta" aria-live="polite">0 / 20,000</div></div><button class="btn" id="searchBtn">Search live</button></div></div></header>
@@ -40,9 +40,14 @@ function render(d){
  html+=`<div class="mini" style="margin-top:18px"><b>Full source trail</b><div class="sources">${(d.sources||[]).map(sourceHtml).join('')}</div></div>`;
  $('results').innerHTML=html||'<div class="empty">No synthesis could be formed from the research.</div>';
 }
+let researchThread={rootQuestion:'',turns:[]};
 async function search(){
- const q=$('q').value.trim(); if(!q)return;
- $('status').textContent='Finding sources…';
+ const followup=$('q').value.trim(); if(!followup)return;
+ const isFollowup=!!researchThread.rootQuestion;
+ const q=isFollowup
+   ? researchThread.rootQuestion+"\n\nFOLLOW-UP QUESTION: "+followup+"\n\nConversation so far:\n"+researchThread.turns.slice(-4).map(t=>t.role+": "+t.text).join("\n")
+   : followup;
+ $('status').textContent=isFollowup?'Researching your follow-up…':'Finding sources…';
  $('results').innerHTML='<div class="empty">Care Wisdom is finding independent patient/caregiver experiences and clinical sources…</div>';
  try{
   const r=await fetch('/api/search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q})});
@@ -50,6 +55,8 @@ async function search(){
   try{d=JSON.parse(raw)}catch{throw new Error('Source search returned a non-JSON error ('+r.status+').')}
   if(!r.ok)throw new Error(d.detail?d.error+': '+d.detail:d.error||'Source search failed');
   if(!d.sources?.length)throw new Error('No useful sources were found.');
+  if(!isFollowup) researchThread.rootQuestion=followup;
+  researchThread.turns.push({role:'user',text:followup});
   $('status').textContent='Found '+d.sources.length+' sources — synthesizing…';
   $('results').innerHTML='<div class="empty">Sources found. Now comparing lived experience, clinical context, disagreement, and care-team questions.</div>';
   const s=await fetch('/api/synthesize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,sources:d.sources})});
@@ -57,6 +64,12 @@ async function search(){
   try{out=JSON.parse(sraw)}catch{throw new Error('Synthesis returned a non-JSON error ('+s.status+').')}
   if(!s.ok)throw new Error(out.detail?out.error+': '+out.detail:out.error||'Synthesis failed');
   render(out);
+  if(isFollowup){
+    const label=document.createElement('div');
+    label.className='thread-context';
+    label.innerHTML='<b>Research thread</b><span>Continuing from: '+esc(researchThread.rootQuestion)+'</span>';
+    $('results').insertBefore(label,$('results').firstChild);
+  }
   if(out.safety_flags?.length)$('results').insertAdjacentHTML('afterbegin','<div class="mini danger" style="margin-bottom:18px"><b>Clinical safety flag</b>'+esc(out.safety_flags.join(' '))+'</div>');
  }catch(e){
   $('status').textContent='Research error';
@@ -76,6 +89,7 @@ function updateQueryMeta(){
 }
 $('q').addEventListener('input',updateQueryMeta);
 $('searchBtn').addEventListener('click',search);
+$('q').placeholder='Ask a research question — or ask a follow-up about the results';
 $('q').addEventListener('keydown',e=>{
  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();search();}
 });
