@@ -125,7 +125,7 @@ export default async function handler(req, res) {
 
     const used = new Set(patterns.flatMap(p => p.evidence_trail.map(x => x.url)));
     const singleReports = sources
-      .filter(s => s && (s.type === "community" || s.type === "journalism") && !used.has(s.url))
+      .filter(s => s && s.type === "community" && !used.has(s.url))
       .slice(0, 5)
       .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
 
