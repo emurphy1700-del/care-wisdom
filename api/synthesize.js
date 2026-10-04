@@ -121,6 +121,12 @@ export default async function handler(req, res) {
 
     if (/freez|chair|stand|transfer|cue|getting out/.test(q)) {
       addPattern(
+        "Caregivers describe freezing during transfers",
+        ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
+        ["What transfer technique has PT/OT taught for this specific person?", "What should caregivers do when freezing occurs during a chair-to-bathroom transfer?", "Which parts of the transfer are actually unsafe or causing near-misses?"],
+        ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"]
+      );
+      addPattern(
         "Using simple cues and slowing the movement",
         ["cue", "count", "rhythm", "music", "visual", "slow", "march", "step"],
         ["Which verbal, visual, or rhythmic cues are appropriate for this specific transfer?", "What should staff do if a cue makes freezing worse?"],
