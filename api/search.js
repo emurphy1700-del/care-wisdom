@@ -104,15 +104,12 @@ export default async function handler(req,res){
     // Deliberately protect space for the kind of evidence Care Wisdom is built around:
     // firsthand caregiver/patient discussions. Clinical sources are then used as a check,
     // not allowed to crowd the lived-experience pool out of the result set.
-    const community=deduped
-      .filter(x=>x.type==="community" && isUsefulFirsthand(x))
-      .filter(x=>isQuestionRelevant(x,q,2));
-    const clinical=deduped
-      .filter(x=>x.type==="clinical"||x.type==="patient_org")
-      .filter(x=>isQuestionRelevant(x,q,1));
-    const journalism=deduped
-      .filter(x=>x.type==="journalism" && isUsefulPublicReporting(x))
-      .filter(x=>isQuestionRelevant(x,q,1));
+    // Do not apply the question-relevance gate yet. Search results often have
+    // thin titles/snippets; a genuinely relevant firsthand discussion may only
+    // reveal its relevance after page extraction.
+    const community=deduped.filter(x=>x.type==="community" && isUsefulFirsthand(x));
+    const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
+    const journalism=deduped.filter(x=>x.type==="journalism" && isUsefulPublicReporting(x));
     // Never pad the evidence pool with navigation pages, directories, event pages,
     // generic topic hubs, or unrelated "other" results. Care Wisdom would rather
     // return 9 good sources than 18 impressive-looking but irrelevant ones.
@@ -162,9 +159,12 @@ export default async function handler(req,res){
     // Final evidence gate: a firsthand source must still contain the question's
     // substantive terms after extraction. This prevents an unrelated caregiver
     // article from becoming "evidence" merely because it came from AgingCare.
-    const relevantSelected=selected.filter(s =>
-      s.type!=="community" || isQuestionRelevant(s,q,2)
-    );
+    const relevantSelected=selected.filter(s => {
+      if(s.type==="community") return isQuestionRelevant(s,q,2);
+      if(s.type==="clinical" || s.type==="patient_org") return isQuestionRelevant(s,q,1);
+      if(s.type==="journalism") return isQuestionRelevant(s,q,1);
+      return false;
+    });
 
     const domains=[...new Set(relevantSelected.map(x=>x.domain).filter(Boolean))];
 
