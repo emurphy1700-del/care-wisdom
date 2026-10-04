@@ -1,6 +1,24 @@
 export const maxDuration=60;
 
-export default async function handler(req,res){
+
+function safetyFlags(q){
+  const s=String(q||"").toLowerCase();
+  const flags=[];
+  if(/near[- ]?faint|fainting|pass(?:es|ed|ing)? out|syncope|almost pass out|almost faint/.test(s))
+    flags.push("Seek prompt clinical evaluation for near-fainting or fainting; Care Wisdom should not turn anecdotal reports into instructions.");
+  if(/fall|falls|fell|falling/.test(s))
+    flags.push("Repeated or significant falls warrant clinical assessment and fall-risk review.");
+  if(/chest pain|breathing trouble|shortness of breath|difficulty breathing/.test(s))
+    flags.push("Chest pain or significant breathing difficulty requires prompt medical evaluation.");
+  if(/chok|swallow/.test(s))
+    flags.push("Choking or significant swallowing difficulty warrants prompt clinical and speech-language evaluation.");
+  if(/sudden.*(weak|confus|speech|vision)|stroke|new neurological/.test(s))
+    flags.push("Sudden neurological changes require immediate medical evaluation.");
+  if(/change.*medication|stop.*medication|increase.*dose|decrease.*dose|medication.*change/.test(s))
+    flags.push("Medication changes should be made with the prescribing clinician or pharmacist, not from anecdotal reports.");
+  return flags;
+}
+\nexport default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
  if(!process.env.PARALLEL_API_KEY)return res.status(503).json({error:"Provider not configured"});
  try{
