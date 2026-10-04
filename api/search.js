@@ -192,7 +192,17 @@ export default async function handler(req,res){
     // Do not apply the question-relevance gate yet. Search results often have
     // thin titles/snippets; a genuinely relevant firsthand discussion may only
     // reveal its relevance after page extraction.
-    const community=deduped.filter(x=>x.type==="community" && isUsefulFirsthand(x));
+    const communityCandidates=deduped.filter(x=>x.type==="community");
+    const communityRejections=[];
+    const community=communityCandidates.filter(x=>{
+      if(isUsefulFirsthand(x)) return true;
+      let reason="firsthand-evidence-gate";
+      const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
+      if(x.domain==="reddit.com" && !/\/r\/[^/]+\/comments\/[^/?#]+/.test(String(x.url||""))) reason="reddit-not-individual-thread";
+      else if(/\/topics?\/|\/forums\/?$|directory|webinar|workshop|landing|\/caregiving-information|\/carepartner|\/caregiver-forum/.test(h)) reason="navigation-or-topic-page";
+      communityRejections.push({domain:x.domain,title:String(x.title||"").slice(0,180),url:x.url,reason});
+      return false;
+    });
     const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
     const journalism=deduped.filter(x=>x.type==="journalism" && isUsefulPublicReporting(x));
     // Never pad the evidence pool with navigation pages, directories, event pages,
@@ -245,14 +255,31 @@ export default async function handler(req,res){
     // Final evidence gate: a firsthand source must still contain the question's
     // substantive terms after extraction. This prevents an unrelated caregiver
     // article from becoming "evidence" merely because it came from AgingCare.
+    const relevanceRejections=[];
     const relevantSelected=selected.filter(s => {
-      if(s.type==="community") return isQuestionRelevant(s,q,2);
-      if(s.type==="clinical" || s.type==="patient_org") return isQuestionRelevant(s,q,1);
-      if(s.type==="journalism") return isQuestionRelevant(s,q,1);
-      return false;
+      let ok=false;
+      if(s.type==="community") ok=isQuestionRelevant(s,q,2);
+      else if(s.type==="clinical" || s.type==="patient_org") ok=isQuestionRelevant(s,q,1);
+      else if(s.type==="journalism") ok=isQuestionRelevant(s,q,1);
+      if(!ok) relevanceRejections.push({domain:s.domain,title:String(s.title||"").slice(0,180),url:s.url,type:s.type});
+      return ok;
     });
 
     const domains=[...new Set(relevantSelected.map(x=>x.domain).filter(Boolean))];
+    const redditAll=[...redditDiscoveryResults,...redditResults,...recoveryResults].map(normalizeResult).filter(x=>x.url);
+    const redditDebug={
+      discovery_candidates:redditDiscoveryResults.length,
+      provider_candidates:redditResults.length,
+      recovery_candidates:recoveryResults.length,
+      unique_reddit_candidates:redditAll.filter(x=>x.domain==="reddit.com").length,
+      unique_reddit_candidate_samples:redditAll.filter(x=>x.domain==="reddit.com").slice(0,6).map(x=>({title:String(x.title||"").slice(0,180),url:x.url,excerpt:String((x.excerpts||[])[0]||"").slice(0,500)})),
+      rejected_by_firsthand_gate:communityRejections.filter(x=>x.domain==="reddit.com").length,
+      firsthand_rejection_samples:communityRejections.filter(x=>x.domain==="reddit.com").slice(0,6),
+      rejected_by_relevance_gate:relevanceRejections.filter(x=>x.domain==="reddit.com").length,
+      relevance_rejection_samples:relevanceRejections.filter(x=>x.domain==="reddit.com").slice(0,6),
+      selected_reddit:selected.filter(x=>x.domain==="reddit.com").length,
+      final_reddit:relevantSelected.filter(x=>x.domain==="reddit.com").length
+    };
 
     return res.status(200).json({
       question:q,
@@ -273,7 +300,8 @@ export default async function handler(req,res){
           qualifying_community_candidates:community.length,
           qualifying_reddit_candidates:reddit.length,
           final_lived_experience:relevantSelected.filter(x=>x.type==="community").length,
-          final_reddit:relevantSelected.filter(x=>x.domain==="reddit.com").length
+          final_reddit:relevantSelected.filter(x=>x.domain==="reddit.com").length,
+          reddit:redditDebug
         },
         aarp_sources:relevantSelected.filter(x=>x.domain==="aarp.org").length,
         public_sources:relevantSelected.filter(x=>x.type==="journalism").length,
