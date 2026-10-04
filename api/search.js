@@ -97,8 +97,23 @@ export default async function handler(req,res){
     ];
     const settled=await Promise.allSettled(searches);
     const [communityResults,clinicalResults,generalResults,redditResults,aarpResults]=settled.map(x=>x.status==="fulfilled"?x.value:[]);
+    let recoveryResults=[];
+    let recoveryAttempts=0;
+    // Adaptive recovery: if the provider did not return any Reddit/community
+    // candidates, run one focused pass with simpler human-language formulations.
+    if(redditResults.length===0 || communityResults.length===0){
+      recoveryAttempts=1;
+      const recoverySettled=await Promise.allSettled([
+        providerSearch(
+          "Find direct individual patient or caregiver discussion threads about this exact problem. Prefer Reddit Parkinson's communities and Parkinson's News Today forums. Return the thread itself, not a topic page or forum index. Look for concrete descriptions of what someone tried and what happened.",
+          buildCommunityRecoveryQueries(q),
+          14
+        )
+      ]);
+      recoveryResults=recoverySettled[0].status==="fulfilled"?recoverySettled[0].value:[];
+    }
     const searchFailures=settled.filter(x=>x.status==="rejected").length;
-        const results=[...redditResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
+        const results=[...redditResults,...recoveryResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
     const deduped=[]; const seen=new Set();
     for(const x of results){
       const key=canonical(x.url);
@@ -119,11 +134,12 @@ export default async function handler(req,res){
     // generic topic hubs, or unrelated "other" results. Care Wisdom would rather
     // return 9 good sources than 18 impressive-looking but irrelevant ones.
     const reddit=community.filter(x=>x.domain==="reddit.com");
+    const communityForums=community.filter(x=>x.domain!=="reddit.com");
     // Build the pool in evidence order. Firsthand discussions get priority;
     // clinical context comes next; journalism is supplementary context.
     const selected=diversifyByDomain([
       ...reddit,
-      ...community,
+      ...communityForums,
       ...clinical,
       ...journalism
     ],18);
@@ -180,9 +196,20 @@ export default async function handler(req,res){
       source_stats:{
         total:relevantSelected.length,
         independent_domains:domains.length,
-        lived_experience_sources:community.length,
+        // These counts are based on the final evidence set, not pre-filter candidates.
+        lived_experience_sources:relevantSelected.filter(x=>x.type==="community").length,
         selected_lived_experience_sources:relevantSelected.filter(x=>x.type==="community").length,
         reddit_sources:relevantSelected.filter(x=>x.domain==="reddit.com").length,
+        retrieval_debug:{
+          raw_community_candidates:communityResults.length,
+          raw_reddit_candidates:redditResults.length,
+          recovery_attempts:recoveryAttempts,
+          recovery_candidates:recoveryResults.length,
+          qualifying_community_candidates:community.length,
+          qualifying_reddit_candidates:reddit.length,
+          final_lived_experience:relevantSelected.filter(x=>x.type==="community").length,
+          final_reddit:relevantSelected.filter(x=>x.domain==="reddit.com").length
+        },
         aarp_sources:relevantSelected.filter(x=>x.domain==="aarp.org").length,
         public_sources:relevantSelected.filter(x=>x.type==="journalism").length,
         domains,
@@ -232,6 +259,26 @@ function buildQueries(q){
   }
   return [...new Set(queries)].map(x=>x.slice(0,240)).slice(0,20);
 }
+function buildCommunityRecoveryQueries(q){
+  const lower=String(q||"").toLowerCase();
+  const out=[];
+  out.push("site:reddit.com/r/ParkinsonsCaregivers "+q);
+  out.push("site:reddit.com/r/Parkinsons "+q+" caregiver");
+  if(/freez|stuck|chair|sit to stand|get(ting)? up|transfer/.test(lower)){
+    out.push("site:reddit.com/r/ParkinsonsCaregivers Parkinson's freezing chair transfer what helped");
+    out.push("site:reddit.com/r/Parkinsons freezing sit to stand caregiver");
+    out.push("site:parkinsonsnewstoday.com/forums/forums/topic Parkinson's freezing caregiver");
+  } else if(/rehab|physical therapy|pt|nursing|snf|progress/.test(lower)){
+    out.push("site:reddit.com/r/ParkinsonsCaregivers Parkinson's rehabilitation physical therapy caregiver experience");
+    out.push("site:reddit.com/r/Parkinsons Parkinson's rehab PT caregiver what helped");
+    out.push("site:parkinsonsnewstoday.com/forums/forums/topic Parkinson's rehabilitation caregiver");
+  } else {
+    out.push("site:reddit.com/r/ParkinsonsCaregivers Parkinson's caregiver what helped");
+    out.push("site:reddit.com/r/Parkinsons Parkinson's caregiver what worked");
+    out.push("site:parkinsonsnewstoday.com/forums/forums/topic Parkinson's caregiver experience");
+  }
+  return [...new Set(out)].map(x=>x.slice(0,240)).slice(0,6);
+}
 function buildBranches(q){
   const lower=q.toLowerCase();
   const b=[
@@ -265,7 +312,7 @@ function canonical(u){try{const x=new URL(u);["utm_source","utm_medium","utm_cam
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
 function isUsefulFirsthand(x){
   const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
-  const bad=/(^|\.)support\.zoom\.com|eventbrite|wikipedia\.org|dictionary|glossary|directory|webinar|workshop|landing|\/topics?\/|\/caregiving-information|\/carepartner|\/resources-support\/carepartners\/pointers|\/caregiver-forum/.test(h);
+  const bad=/(^|\.)support\.zoom\.com|eventbrite|wikipedia\.org|dictionary|glossary|directory|webinar|workshop|landing|\/topics?\/|\/caregiving-information|\/carepartner|\/resources-support\/carepartners\/pointers|\/caregiver-forum|\/forums\/?$/.test(h);
   if(bad)return false;
   if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\/[^/?#]+/.test(String(x.url||""));
   if(x.domain==="agingcare.com") {
@@ -283,7 +330,7 @@ function isUsefulPublicReporting(x){
 }
 function guessType(url,title){
   const h=(url+" "+title).toLowerCase();
-  if(/agingcare\.com|reddit\.com|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
+  if(/agingcare\.com|reddit\.com|parkinson(s)?snewstoday\.com\/forums|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
   if(/parkinson\.org|lbda|movementdisorders\.org/.test(h))return "patient_org";
   if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|neuropt\.org|apta\.org|\.edu\//.test(h))return "clinical";
   if(/reuters|nytimes|washingtonpost|aarp|statnews|npr\.org|apnews|bbc|theatlantic|time\.com|usatoday|forbes|bloomberg/.test(h))return "journalism";
