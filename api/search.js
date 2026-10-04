@@ -47,12 +47,19 @@ export default async function handler(req,res){
             let data; try{data=JSON.parse(raw)}catch{continue}
             for(const page of (data.results||[])){
               const text=(page.excerpts||[]).join("\n")+" "+JSON.stringify(page);
-              const re=/https?:\/\/(?:www\.)?reddit\.com\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi;
-              let m;
-              while((m=re.exec(text))){
-                const url=canonical(m[0].replace(/[.,;]+$/,""));
-                if(!url||!url.includes("/comments/")) continue;
-                found.set(url,{title:"Reddit caregiver discussion",url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
+              const patterns=[
+                /https?:\/\/(?:www\.)?reddit\.com\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi,
+                /\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi
+              ];
+              for(const re of patterns){
+                let m;
+                while((m=re.exec(text))){
+                  let raw=m[0].replace(/[.,;]+$/,"");
+                  if(raw.startsWith("/r/")) raw="https://www.reddit.com"+raw;
+                  const url=canonical(raw);
+                  if(!url||!url.includes("/comments/")) continue;
+                  found.set(url,{title:"Reddit caregiver discussion",url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
+                }
               }
             }
           }catch{}
