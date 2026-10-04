@@ -35,55 +35,51 @@ export default async function handler(req,res){
     }
 
     async function discoverRedditViaSearchPages(question){
-      const lower=String(question||"").toLowerCase();
-      const q=/freez|stuck/.test(lower)
-        ? "freezing transfers"
-        : String(question||"").slice(0,180);
-      const found=new Map();
+  const lower=String(question||"").toLowerCase();
+  const q=/freez|stuck/.test(lower) ? "freezing transfers" : String(question||"").slice(0,180);
+  const found=new Map();
 
-      // Reddit RSS is used only for discovery. It is public, lightweight, and
-      // gives us individual /comments/ URLs; Parallel then fetches the actual
-      // discussion for evidence extraction.
-      for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
-        const u="https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all";
-        const controller=new AbortController();
-        const timer=setTimeout(()=>controller.abort(),5000);
-        try{
-          const rr=await fetch(u,{
-            headers:{"User-Agent":"CareWisdomResearch/1.0 (public research discovery)"},
-            signal:controller.signal
-          });
-          if(!rr.ok) continue;
-          const xml=await rr.text();
+  for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
+    const u="https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all";
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),5000);
+    try{
+      const rr=await fetch(u,{
+        headers:{"User-Agent":"CareWisdomResearch/1.0 (public research discovery)"},
+        signal:controller.signal
+      });
+      if(!rr.ok) continue;
+      const xml=await rr.text();
+      const entries=xml.split("<entry>").slice(1);
 
-          const entryRe=/<entry>([\\s\\S]*?)<\\/entry>/gi;
-          let entry;
-          while((entry=entryRe.exec(xml))){
-            const block=entry[1];
-            const linkMatch=block.match(/<link href="(https?:\\/\\/www\\.reddit\\.com\\/r\\/[^"]+\\/comments\\/[^"]+)"/i);
-            if(!linkMatch) continue;
-            const url=canonical(linkMatch[1]);
-            if(!url) continue;
-            const titleMatch=block.match(/<title>([\\s\\S]*?)<\\/title>/i);
-            const title=decodeXml(titleMatch?.[1]||"Reddit caregiver discussion");
-            const contentMatch=block.match(/<content[^>]*>([\\s\\S]*?)<\\/content>/i);
-            const rawContent=decodeXml(contentMatch?.[1]||"");
-            found.set(url,{
-              title,
-              url,
-              domain:"reddit.com",
-              published_date:null,
-              excerpts:rawContent ? [stripHtml(rawContent).slice(0,1800)] : [],
-              type:"community",
-              discovery_method:"reddit_rss"
-            });
-          }
-        }catch{}finally{
-          clearTimeout(timer);
-        }
+      for(const block of entries){
+        const linkMatch=block.match(/<link href="([^"]+)"/i);
+        const rawUrl=linkMatch?.[1]||"";
+        if(!/reddit\.com\/r\/[^/]+\/comments\//i.test(rawUrl)) continue;
+        const url=canonical(rawUrl);
+        if(!url) continue;
+
+        const titleMatch=block.match(/<title>([\\s\\S]*?)<\/title>/i);
+        const contentMatch=block.match(/<content[^>]*>([\\s\\S]*?)<\/content>/i);
+        const title=decodeXml(titleMatch?.[1]||"Reddit caregiver discussion");
+        const rawContent=decodeXml(contentMatch?.[1]||"");
+
+        found.set(url,{
+          title,
+          url,
+          domain:"reddit.com",
+          published_date:null,
+          excerpts:rawContent ? [stripHtml(rawContent).slice(0,1800)] : [],
+          type:"community",
+          discovery_method:"reddit_rss"
+        });
       }
-      return [...found.values()].slice(0,12);
+    }catch{}finally{
+      clearTimeout(timer);
     }
+  }
+  return [...found.values()].slice(0,12);
+}
 
 
     // Run distinct evidence searches. This is intentional: a single broad search
