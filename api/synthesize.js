@@ -225,13 +225,6 @@ export default async function handler(req, res) {
         ["What pacing and communication should caregivers use during a freezing episode?", "Which cues or physical assistance should caregivers avoid?"],
         ["Caregiver communication", "Freezing triggers", "Safe transfer assistance"]
       );
-    } else {
-      addPattern(
-        "Recurring practical approaches in the source set",
-        ["help", "try", "care", "patient", "caregiver", "experience"],
-        ["What does the care team think is most relevant to this situation?", "What should be measured or documented to see whether an approach helps?"],
-        ["Caregiver experiences", "Clinical context", "Questions for the care team"]
-      );
     }
 
     const used = new Set(patterns.flatMap(p => p.evidence_trail.map(x => x.url)));
@@ -290,7 +283,7 @@ export default async function handler(req, res) {
           return "The research surfaced potentially relevant reports, but the evidence is too limited to call them recurring independent patterns. Care Wisdom separates firsthand reports from clinical context and preserves uncertainty.";
         }
 
-        return "The evidence pool did not produce a recurring pattern strong enough to promote.";
+        return "No reliable recurring pattern was found for this question. Care Wisdom found some potentially related clinical information, but not enough directly relevant evidence to form a useful pattern.";
       })(),
       single_reports: singleReports,
       patterns: patterns.slice(0, 4),
