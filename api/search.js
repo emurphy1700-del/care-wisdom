@@ -357,6 +357,9 @@ function buildCommunityRecoveryQueries(q){
   const out=[];
   out.push("site:reddit.com/r/ParkinsonsCaregivers "+q);
   out.push("site:reddit.com/r/Parkinsons "+q+" caregiver");
+  out.push("Parkinson caregiver freezing transfers");
+  out.push("Parkinson caregiver freezing chair what helped");
+  out.push("Parkinson caregiver freezing sit to stand");
   if(/freez|stuck|chair|sit to stand|get(ting)? up|transfer/.test(lower)){
     out.push("site:reddit.com/r/ParkinsonsCaregivers Parkinson's freezing chair transfer what helped");
     out.push("site:reddit.com/r/Parkinsons freezing sit to stand caregiver");
