@@ -47,8 +47,10 @@ export default async function handler(req, res) {
       return (hits.length ? hits.slice(0,2).join(" ") : t).slice(0,420);
     };
 
-    const addPattern = (title, words, questionList, rabbitHoles) => {
-      const matching = sources.filter(s => s && has(s, words));
+    const addPattern = (title, words, questionList, rabbitHoles, sourceMatcher = null) => {
+      const matching = sourceMatcher
+        ? sources.filter(s => s && sourceMatcher(s))
+        : sources.filter(s => s && has(s, words));
       if (!matching.length) return;
 
       const exp = matching.filter(s => s.type === "community");
@@ -137,7 +139,8 @@ export default async function handler(req, res) {
         "Caregivers describe freezing during transfers",
         ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
         ["What transfer technique has PT/OT taught for this specific person?", "What should caregivers do when freezing occurs during a chair-to-bathroom transfer?", "Which parts of the transfer are actually unsafe or causing near-misses?"],
-        ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"]
+        ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"],
+        s => s.type === "community" || ((s.type === "clinical" || s.type === "patient_org") && has(s, words))
       );
       addPattern(
         "Using simple cues and slowing the movement",
