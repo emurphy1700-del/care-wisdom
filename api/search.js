@@ -78,6 +78,47 @@ export default async function handler(req,res){
       clearTimeout(timer);
     }
   }
+  // Server-side Reddit access can be blocked from Vercel. If direct RSS
+  // discovery produced nothing, fetch the same public RSS URL through Parallel,
+  // which we know can access it, and recover the individual /comments/ links.
+  if(found.size===0){
+    for(const subreddit of ["ParkinsonsCaregivers"]){
+      const u="https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all";
+      try{
+        const fr=await fetch("https://api.parallel.ai/v1/fetch",{
+          method:"POST",
+          headers:{
+            "x-api-key":process.env.PARALLEL_API_KEY,
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            urls:[u],
+            objective:"Return the public RSS content and preserve every individual Reddit discussion URL. We need the actual /r/ParkinsonsCaregivers/comments/ thread URLs, titles, and entry content. Do not summarize away the URLs.",
+            full_content:true,
+            allow_live_fetch:true
+          })
+        });
+        if(!fr.ok) continue;
+        const data=await fr.json();
+        const text=JSON.stringify(data);
+        const urlRe=/https?:\\/\\/(?:www\\.)?reddit\\.com\\/r\\/[^\\s"<>]+\\/comments\\/[^\\s"<>]+/gi;
+        let m;
+        while((m=urlRe.exec(text))){
+          const url=canonical(m[0].replace(/[.,;]+$/,""));
+          if(!url||found.has(url)) continue;
+          found.set(url,{
+            title:"Reddit caregiver discussion",
+            url,
+            domain:"reddit.com",
+            published_date:null,
+            excerpts:[],
+            type:"community",
+            discovery_method:"reddit_rss_parallel"
+          });
+        }
+      }catch{}
+    }
+  }
   return [...found.values()].slice(0,12);
 }
 
