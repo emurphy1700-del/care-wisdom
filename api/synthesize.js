@@ -199,7 +199,12 @@ export default async function handler(req, res) {
       });
     };
 
-    if (/freez|chair|stand|transfer|cue|getting out/.test(q)) {
+    // Only use the freezing/transfer pattern library when the question
+    // explicitly asks about that problem. Generic words such as "standing"
+    // or "getting up" can appear in many unrelated clinical questions
+    // (orthostatic symptoms, falls, weakness, PT, etc.) and must not trigger
+    // freezing-specific synthesis.
+    if (/(freez|stuck|transfer|chair|recliner|sit[- ]?to[- ]stand|getting out of (a |the )?(chair|bed)|cueing|cue|gait freezing)/i.test(q)) {
       addPattern(
         "Caregivers describe freezing during transfers",
         ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
