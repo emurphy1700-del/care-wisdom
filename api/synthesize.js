@@ -98,15 +98,30 @@ export default async function handler(req, res) {
         });
 
       const clinicalExcerpts = clin
-        .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
-        .map(x => String(x || "").replace(/\s+/g, " ").trim())
-        .filter(x => {
-          const lower = x.toLowerCase();
-          const hits = words.filter(w => lower.includes(String(w).toLowerCase())).length;
-          const nav = /quick summary|management includes|sign in|create account|home|topics|resources|search|table of contents/i.test(lower);
-          return hits >= Math.min(2, Math.max(1, words.length)) && !nav && x.length >= 80;
+        .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts.map(x => ({
+          sourceTitle: String(s.title || "").replace(/\s+/g, " ").trim(),
+          excerpt: String(x || "").replace(/\s+/g, " ").trim()
+        })) : [])
+        .flatMap(({sourceTitle, excerpt}) => {
+          const titleLower = sourceTitle.toLowerCase();
+          // Extract sentences from the body, then discard sentences that are
+          // effectively the article title, author/affiliation metadata, or
+          // navigation/abstract labels. Care Wisdom should quote evidence, not
+          // simply repeat the title of the paper.
+          return excerpt.split(/(?<=[.!?])\s+/)
+            .map(s => s.trim())
+            .filter(s => s.length >= 55)
+            .filter(s => s.toLowerCase() !== titleLower)
+            .filter(s => !/^(abstract|introduction|background|methods|results|conclusion|quick summary|affiliations?)\b/i.test(s))
+            .filter(s => !/quick summary|management includes|sign in|create account|home|topics|resources|search|table of contents/i.test(s))
+            .map(s => ({sourceTitle, sentence:s}));
         })
-        .map(x => focusEvidenceExcerpt(x, words))
+        .filter(({sentence}) => {
+          const lower = sentence.toLowerCase();
+          const hits = words.filter(w => lower.includes(String(w).toLowerCase())).length;
+          return hits >= Math.min(2, Math.max(1, words.length));
+        })
+        .map(({sourceTitle, sentence}) => focusEvidenceExcerpt(sentence, words))
         .filter(Boolean)
         .slice(0, 2);
 
@@ -158,7 +173,7 @@ export default async function handler(req, res) {
         evidence_check: clinicalExcerpts.length
           ? clinicalExcerpts.map(x => "“" + x + "”").join(" ")
           : clin.length
-            ? "Clinical sources address this theme, but the available extracts are too thin for a stronger evidence statement."
+            ? "Clinical sources address this theme, but the extracted passages did not contain a clean, directly relevant evidence passage. Care Wisdom is not treating the article title or abstract label as evidence."
             : "No qualifying clinical source in this evidence set directly addressed this theme.",
         disagreement: exp.length && clin.length
           ? "The evidence comes from different kinds of sources and contexts. It does not establish that the same approach works for everyone."
