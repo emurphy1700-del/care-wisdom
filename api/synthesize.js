@@ -99,8 +99,13 @@ export default async function handler(req, res) {
 
       const clinicalExcerpts = clin
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
-        .filter(x => words.some(w => String(x).toLowerCase().includes(w)))
-        .slice(0, 3)
+        .map(x => String(x || "").replace(/\s+/g, " ").trim())
+        .filter(x => {
+          const lower = x.toLowerCase();
+          const hits = words.filter(w => lower.includes(String(w).toLowerCase())).length;
+          const nav = /quick summary|management includes|sign in|create account|home|topics|resources|search|table of contents/i.test(lower);
+          return hits >= Math.min(2, Math.max(1, words.length)) && !nav && x.length >= 80;
+        })
         .map(x => focusEvidenceExcerpt(x, words))
         .filter(Boolean)
         .slice(0, 2);
@@ -148,7 +153,7 @@ export default async function handler(req, res) {
           : fallbackReports.length
             ? fallbackReports.join(" ")
             : exp.length
-              ? "Firsthand sources were found, but the page extracts were too thin to safely summarize what was reported."
+              ? "A relevant firsthand source was found, but its extracted passage was too thin to safely summarize what was reported. This is not treated as a recurring pattern."
               : "No qualifying firsthand report was found for this specific theme.",
         evidence_check: clinicalExcerpts.length
           ? clinicalExcerpts.map(x => "“" + x + "”").join(" ")
