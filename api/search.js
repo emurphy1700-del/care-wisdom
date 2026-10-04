@@ -162,9 +162,15 @@ export default async function handler(req,res){
     // Final evidence gate: a firsthand source must still contain the question's
     // substantive terms after extraction. This prevents an unrelated caregiver
     // article from becoming "evidence" merely because it came from AgingCare.
-    const relevantSelected=selected.filter(s =>
-      s.type!=="community" || isQuestionRelevant(s,q,2)
-    );
+    const relevantSelected=selected.filter(s => {
+      if(s.type!=="community") return true;
+      // A valid discussion page is not enough: its extracted passage must
+      // contain substantive, question-relevant experience rather than site
+      // navigation or a bundle of unrelated question titles.
+      const usable=(s.excerpts||[]).filter(e=>isSubstantiveFirsthandExcerpt(e,q));
+      s.excerpts=usable.slice(0,4);
+      return usable.length>0;
+    });
 
     const domains=[...new Set(relevantSelected.map(x=>x.domain).filter(Boolean))];
 
@@ -261,6 +267,22 @@ function guessType(url,title){
   return "other";
 }
 
+
+function isSubstantiveFirsthandExcerpt(excerpt,question){
+  const t=String(excerpt||"").replace(/\\s+/g," ").trim().toLowerCase();
+  if(!t || t.length<80) return false;
+  // Reject obvious navigation/link-directory fragments.
+  const navHits=(t.match(/\\[[^\\]]+\\]\\(https?:/g)||[]).length;
+  const navWords=(t.match(/caregiver forum|parkinson'?s disease|questions|topics|resources|sign in|create account|home|search/g)||[]).length;
+  if(navHits>=3 || navWords>=4) return false;
+
+  // It must contain at least two concepts relevant to the question.
+  if(!isQuestionRelevant({title:"",url:"",excerpts:[t]},question,2)) return false;
+
+  // And it should contain some signal that this is an actual experience,
+  // question, attempt, or outcome rather than educational navigation.
+  return /(i |i'm|my |we |our |husband|wife|mother|father|mom|dad|patient|caregiver|asked|tried|helped|worked|didn't|couldn't|can'?t|unable|found|experience|happened|after|before)/.test(t);
+}
 
 function isQuestionRelevant(source, question, minHits=1){
   const q=String(question||"").toLowerCase();
