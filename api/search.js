@@ -323,14 +323,14 @@ function extractResults(data){
   const candidates=data?.results||data?.search_results||data?.items||data?.data||[];
   return Array.isArray(candidates)?candidates:[];
 }
-function normalizeResult(x){
+function cleanEvidenceText(value){\n  let s=String(value||"");\n  s=s.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)]+)\\)/g,"$1");\n  s=s.replace(/https?:\\/\\/[^\\s)]+/g,"");\n  s=s.replace(/^\\s*#{1,6}\\s*/gm,"");\n  s=s.replace(/\\s+/g," ").trim();\n  return s;\n}\nfunction normalizeResult(x){
   const url=x?.url||x?.link||x?.source_url||"";
   const title=x?.title||x?.name||url;
   const excerpts=Array.isArray(x?.excerpts)?x.excerpts:(typeof x?.excerpt==="string"?[x.excerpt]:typeof x?.snippet==="string"?[x.snippet]:[]);
   return {
     title,url,domain:domainOf(url),
     published_date:x?.publish_date||x?.published_date||null,
-    excerpts:excerpts.slice(0,3).map(String),
+    excerpts:excerpts.slice(0,3).map(cleanEvidenceText).filter(x=>x.length>=40),
     type:guessType(url,title)
   };
 }
