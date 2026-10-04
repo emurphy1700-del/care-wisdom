@@ -251,7 +251,13 @@ export default async function handler(req,res){
     const relevanceRejections=[];
     const relevantSelected=selected.filter(s => {
       let ok=false;
-      if(s.type==="community") ok=isQuestionRelevant(s,q,2);
+      // Community sources have already passed the firsthand-evidence gate.
+      // For lived experience, require direct relevance to at least one substantive
+      // aspect of the question rather than demanding two concepts. Otherwise a
+      // genuinely useful caregiver account can be discarded simply because its
+      // extracted passage uses different language (e.g. "getting up" vs.
+      // "sit-to-stand").
+      if(s.type==="community") ok=isQuestionRelevant(s,q,1);
       else if(s.type==="clinical" || s.type==="patient_org") ok=isQuestionRelevant(s,q,1);
       else if(s.type==="journalism") ok=isQuestionRelevant(s,q,1);
       if(!ok) relevanceRejections.push({domain:s.domain,title:String(s.title||"").slice(0,180),url:s.url,type:s.type});
