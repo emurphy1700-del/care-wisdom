@@ -33,10 +33,13 @@ export default async function handler(req, res) {
       const pd = /parkinson|parkinsonism|pd\b/.test(text);
       const freezing = /freez|frozen|stuck|couldn.?t move|unable to move/.test(text);
       const transfer = /chair|recliner|seat|sit.?to.?stand|stand up|get(ting)? up|transfer|bathroom|walker|walking|gait/.test(text);
-      // A firsthand report can use ordinary caregiver language and may not
-      // repeat "Parkinson's" or every technical term from the question.
-      // Require the core problem plus a concrete mobility/transfer context.
-      return freezing && transfer && (pd || /caregiver|husband|wife|mother|father|mom|dad|patient|my |we |i /.test(text));
+      // This source has already passed the search layer's firsthand/community
+      // gate. Do not require the excerpt itself to repeat "Parkinson's" or a
+      // caregiver identity phrase: real firsthand posts often use ordinary
+      // language ("he gets stuck getting up from the recliner").
+      // The synthesis gate therefore checks the two substantive concepts only:
+      // freezing/stuck + a concrete transfer/mobility context.
+      return freezing && transfer;
     };
     const journalism = sources.filter(s => s && s.type === "journalism");
 
