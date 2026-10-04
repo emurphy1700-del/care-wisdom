@@ -445,15 +445,20 @@ function guessType(url,title){
 }
 
 
-function isQuestionRelevant(source, question, minHits=1){
+function isQuestionRelevant(source, question, minHits=2){
   const q=String(question||"").toLowerCase();
   const text=[source.title||"",source.url||"",...(source.excerpts||[])].join(" ").toLowerCase();
 
   const groups=[
     ["freezing","freeze","freezes","frozen","stuck","gets stuck","can't move","cannot move","feet won't move"],
     ["chair","recliner","seat","sitting","sit to stand","stand up","rising","getting up","rise from"],
-    ["transfer","mobility","walking","gait","movement","move","steps","standing"],
+    ["transfer","transfers","mobility","walking","gait","movement","move","steps","standing"],
+    ["toilet","toileting","bathroom","commode","bathing","dressing"],
+    ["hoyer","hoyer lift","mechanical lift","ceiling lift","sling"],
     ["cue","cueing","count","countdown","music","rhythm","visual","verbal","march","rock"],
+    ["physical therapy","physiotherapy","pt","occupational therapy","ot","rehab","rehabilitation"],
+    ["blood pressure","orthostatic","hypotension","faint","fainting","near faint","syncope","dizzy","lightheaded"],
+    ["fall","falls","falling","near-fall"],
     ["parkinson","parkinson's","parkinsonism","pd"],
     ["caregiver","carepartner","care partner","husband","wife","mother","father","mom","dad","patient"]
   ];
@@ -461,15 +466,19 @@ function isQuestionRelevant(source, question, minHits=1){
   const active=groups.filter(g=>g.some(term=>q.includes(term)));
   if(!active.length) return true;
 
-  let hits=0;
-  for(const g of active){
-    if(g.some(term=>text.includes(term))) hits++;
-  }
+  const contextual=new Set([
+    "parkinson","parkinson's","parkinsonism","pd",
+    "caregiver","carepartner","care partner","husband","wife","mother","father","mom","dad","patient"
+  ]);
+  const substantive=active.filter(g=>!g.some(term=>contextual.has(term)));
+  const substantiveHits=substantive.filter(g=>g.some(term=>text.includes(term))).length;
 
-  // For community sources, require two distinct concepts from the question.
-  // This prevents unrelated caregiver Q&A from qualifying merely because it
-  // happens to be on AgingCare or another discussion site.
-  return hits >= minHits;
+  // Generic Parkinson's/caregiver material is never enough by itself. For a
+  // specific question, the source must address at least one substantive aspect
+  // of the actual problem. If the question has several substantive aspects,
+  // require at least two when possible.
+  if(substantive.length) return substantiveHits >= Math.min(minHits, substantive.length);
+  return active.filter(g=>g.some(term=>text.includes(term))).length >= minHits;
 }
 
 function diversifyByDomain(items,max){
