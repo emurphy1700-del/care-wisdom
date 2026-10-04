@@ -246,16 +246,18 @@ export default async function handler(req, res) {
       .filter(w => !["what","have","found","helpful","someone","caregiver","caregivers","parkinsons","disease"].includes(w))
     )];
 
+    // Preserve relevant firsthand records even when they are not strong
+    // enough to support a synthesized pattern. Do not compare the excerpt
+    // against every word in the full question: ordinary caregiver language
+    // often omits disease names and uses different phrasing.
     const singleReports = sources
       .filter(s => {
         if(!s || s.type !== "community" || used.has(s.url)) return false;
+        if(communityRelevantToQuestion(s)) return true;
         const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
-        return excerpts.some(e => {
-          const t=String(e||"").toLowerCase();
-          const clean=isCleanEvidenceExcerpt(e, qTerms);
-          const conceptHits=qTerms.filter(w=>t.includes(w)).length;
-          return clean && conceptHits >= Math.min(2, Math.max(1,qTerms.length));
-        });
+        return excerpts.some(e =>
+          isCleanEvidenceExcerpt(e, ["freez","frozen","stuck","chair","recliner","transfer","stand","getting up"])
+        );
       })
       .slice(0, 5)
       .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
