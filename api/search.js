@@ -104,9 +104,15 @@ export default async function handler(req,res){
     // Deliberately protect space for the kind of evidence Care Wisdom is built around:
     // firsthand caregiver/patient discussions. Clinical sources are then used as a check,
     // not allowed to crowd the lived-experience pool out of the result set.
-    const community=deduped.filter(x=>x.type==="community" && isUsefulFirsthand(x));
-    const clinical=deduped.filter(x=>x.type==="clinical"||x.type==="patient_org");
-    const journalism=deduped.filter(x=>x.type==="journalism" && isUsefulPublicReporting(x));
+    const community=deduped
+      .filter(x=>x.type==="community" && isUsefulFirsthand(x))
+      .filter(x=>isQuestionRelevant(x,q,2));
+    const clinical=deduped
+      .filter(x=>x.type==="clinical"||x.type==="patient_org")
+      .filter(x=>isQuestionRelevant(x,q,1));
+    const journalism=deduped
+      .filter(x=>x.type==="journalism" && isUsefulPublicReporting(x))
+      .filter(x=>isQuestionRelevant(x,q,1));
     // Never pad the evidence pool with navigation pages, directories, event pages,
     // generic topic hubs, or unrelated "other" results. Care Wisdom would rather
     // return 9 good sources than 18 impressive-looking but irrelevant ones.
@@ -153,20 +159,27 @@ export default async function handler(req,res){
       }
     }
 
-    const domains=[...new Set(selected.map(x=>x.domain).filter(Boolean))];
+    // Final evidence gate: a firsthand source must still contain the question's
+    // substantive terms after extraction. This prevents an unrelated caregiver
+    // article from becoming "evidence" merely because it came from AgingCare.
+    const relevantSelected=selected.filter(s =>
+      s.type!=="community" || isQuestionRelevant(s,q,2)
+    );
+
+    const domains=[...new Set(relevantSelected.map(x=>x.domain).filter(Boolean))];
 
     return res.status(200).json({
       question:q,
       research_branches:buildBranches(q),
-      sources:selected,
+      sources:relevantSelected,
       source_stats:{
-        total:selected.length,
+        total:relevantSelected.length,
         independent_domains:domains.length,
         lived_experience_sources:community.length,
-        selected_lived_experience_sources:selected.filter(x=>x.type==="community").length,
-        reddit_sources:selected.filter(x=>x.domain==="reddit.com").length,
-        aarp_sources:selected.filter(x=>x.domain==="aarp.org").length,
-        public_sources:selected.filter(x=>x.type==="journalism").length,
+        selected_lived_experience_sources:relevantSelected.filter(x=>x.type==="community").length,
+        reddit_sources:relevantSelected.filter(x=>x.domain==="reddit.com").length,
+        aarp_sources:relevantSelected.filter(x=>x.domain==="aarp.org").length,
+        public_sources:relevantSelected.filter(x=>x.type==="journalism").length,
         domains,
         search_failures:searchFailures
       },
@@ -244,6 +257,14 @@ function guessType(url,title){
   return "other";
 }
 
+
+function isQuestionRelevant(source, question, minHits=1){
+  const stop=new Set(["what","have","has","had","when","where","why","how","does","did","can","could","would","should","someone","people","person","caregiver","caregivers","patient","patients","with","from","that","this","they","their","getting","helpful","found","tried","help","parkinsons","parkinson","disease"]);
+  const qTokens=String(question||"").toLowerCase().replace(/[^a-z0-9\\s-]/g," ").split(/\\s+/).filter(w=>w.length>=4&&!stop.has(w));
+  const text=[source.title||"",source.url||"",...(source.excerpts||[])].join(" ").toLowerCase();
+  const unique=[...new Set(qTokens)];
+  return unique.filter(w=>text.includes(w)).length>=minHits;
+}
 
 function diversifyByDomain(items,max){
   const out=[],counts=new Map(),seen=new Set();
