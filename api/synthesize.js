@@ -137,8 +137,24 @@ export default async function handler(req, res) {
     }
 
     const used = new Set(patterns.flatMap(p => p.evidence_trail.map(x => x.url)));
+    const qTerms = [...new Set(q
+      .replace(/[^a-z0-9\\s-]/g," ")
+      .split(/\\s+/)
+      .filter(w => w.length >= 5)
+      .filter(w => !["what","have","found","helpful","someone","caregiver","caregivers","parkinsons","disease"].includes(w))
+    )];
+
     const singleReports = sources
-      .filter(s => s && s.type === "community" && !used.has(s.url))
+      .filter(s => {
+        if(!s || s.type !== "community" || used.has(s.url)) return false;
+        const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
+        return excerpts.some(e => {
+          const t=String(e||"").toLowerCase();
+          const clean=isCleanEvidenceExcerpt(e, qTerms);
+          const conceptHits=qTerms.filter(w=>t.includes(w)).length;
+          return clean && conceptHits >= Math.min(2, Math.max(1,qTerms.length));
+        });
+      })
       .slice(0, 5)
       .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
 
