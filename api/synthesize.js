@@ -140,7 +140,7 @@ export default async function handler(req, res) {
         ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
         ["What transfer technique has PT/OT taught for this specific person?", "What should caregivers do when freezing occurs during a chair-to-bathroom transfer?", "Which parts of the transfer are actually unsafe or causing near-misses?"],
         ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"],
-        s => s.type === "community" || ((s.type === "clinical" || s.type === "patient_org") && has(s, words))
+        s => s.type === "community" || ((s.type === "clinical" || s.type === "patient_org") && has(s, ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"]))
       );
       addPattern(
         "Using simple cues and slowing the movement",
