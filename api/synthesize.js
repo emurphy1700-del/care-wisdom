@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .slice(0, 2)
         .map(x => String(x).replace(/\s+/g, " ").slice(0, 300));
 
-      const repeated = domains.length >= 2;
+      const repeated = exp.length >= 2 && domains.length >= 2;
 
       patterns.push({
         title,
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
           level: repeated ? "repeated_independent" : "limited_support",
           label: repeated ? "Repeated across source domains" : "Limited support",
           rationale: repeated
-            ? "This appeared in experiential sources from multiple domains. Domain diversity is not a count of independent people."
+            ? "This appeared in firsthand sources from at least two source domains. That still does not establish independent people or prove the approach works for everyone."
             : "This appeared in the supplied evidence, but the available sources do not establish independent repeated reports."
         },
         what_people_reported: excerpts.length
