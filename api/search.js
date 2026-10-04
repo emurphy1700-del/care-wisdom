@@ -36,33 +36,91 @@ export default async function handler(req,res){
 
     async function discoverRedditViaSearchPages(question){
       const lower=String(question||"").toLowerCase();
-      const terms=[question,/freez|stuck/.test(lower)?"freezing transfers":question,/chair|sit to stand|get(ting)? up/.test(lower)?"chair sit to stand":question];
+      const terms=[
+        question,
+        /freez|stuck/.test(lower) ? "freezing transfers" : question,
+        /chair|sit to stand|get(ting)? up/.test(lower) ? "chair sit to stand" : question
+      ];
       const found=new Map();
+
+      // Prefer the public Reddit search page for discovery. Parallel is excellent
+      // at fetching a known discussion, but its search-page extraction is not
+      // deterministic enough to be the sole discovery mechanism.
       for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
         for(const term of terms){
           const u="https://www.reddit.com/r/"+subreddit+"/search/?q="+encodeURIComponent(term)+"&restrict_sr=1&sort=relevance&t=all";
           try{
-            const fr=await fetch("https://api.parallel.ai/v1/fetch",{method:"POST",headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({urls:[u],objective:"Recover individual Reddit discussion links directly relevant to the research question. Return individual /comments/ links and titles; ignore subreddit landing pages.",full_content:false,allow_live_fetch:true})});
-            const raw=await fr.text(); if(!fr.ok) continue;
-            let data; try{data=JSON.parse(raw)}catch{continue}
-            for(const page of (data.results||[])){
-              const text=(page.excerpts||[]).join("\n")+" "+JSON.stringify(page);
-              const patterns=[
-                /https?:\/\/(?:www\.)?reddit\.com\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi,
-                /\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi
-              ];
-              for(const re of patterns){
-                let m;
-                while((m=re.exec(text))){
-                  let raw=m[0].replace(/[.,;]+$/,"");
-                  if(raw.startsWith("/r/")) raw="https://www.reddit.com"+raw;
-                  const url=canonical(raw);
-                  if(!url||!url.includes("/comments/")) continue;
-                  found.set(url,{title:"Reddit caregiver discussion",url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
-                }
+            const rr=await fetch(u,{
+              headers:{
+                "User-Agent":"CareWisdomResearch/1.0 (research companion; public page discovery)"
+              }
+            });
+            if(!rr.ok) continue;
+            const html=await rr.text();
+            const decoded=html
+              .replace(/\\u002F/g,"/")
+              .replace(/\\u0026/g,"&")
+              .replace(/\\\//g,"/");
+            const patterns=[
+              /https?:\\/\\/(?:www\\.)?reddit\\.com\\/r\\/[^"'<>\\s]+\\/comments\\/[^"'<>\\s]+/gi,
+              /\\/r\\/[^"'<>\\s]+\\/comments\\/[^"'<>\\s]+/gi
+            ];
+            for(const re of patterns){
+              let m;
+              while((m=re.exec(decoded))){
+                let raw=m[0].replace(/[.,;]+$/,"");
+                if(raw.startsWith("/r/")) raw="https://www.reddit.com"+raw;
+                const url=canonical(raw);
+                if(!url||!url.includes("/comments/")) continue;
+                found.set(url,{
+                  title:"Reddit caregiver discussion",
+                  url,
+                  domain:"reddit.com",
+                  published_date:null,
+                  excerpts:[],
+                  type:"community",
+                  discovery_method:"reddit_public_search"
+                });
               }
             }
           }catch{}
+        }
+      }
+
+      // If Reddit's HTML search page was unavailable, retain the Parallel
+      // discovery fallback.
+      if(found.size===0){
+        for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
+          for(const term of terms){
+            const u="https://www.reddit.com/r/"+subreddit+"/search/?q="+encodeURIComponent(term)+"&restrict_sr=1&sort=relevance&t=all";
+            try{
+              const fr=await fetch("https://api.parallel.ai/v1/fetch",{
+                method:"POST",
+                headers:{
+                  "x-api-key":process.env.PARALLEL_API_KEY,
+                  "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                  urls:[u],
+                  objective:"Recover individual Reddit discussion links directly relevant to the research question. Return individual /comments/ links and titles; ignore subreddit landing pages.",
+                  full_content:false,
+                  allow_live_fetch:true
+                })
+              });
+              const raw=await fr.text();
+              if(!fr.ok) continue;
+              let data; try{data=JSON.parse(raw)}catch{continue}
+              const text=JSON.stringify(data);
+              const re=/https?:\\/\\/(?:www\\.)?reddit\\.com\\/r\\/[^\\s"<>\\)]+\\/comments\\/[^\\s"<>\\)]+/gi;
+              let m;
+              while((m=re.exec(text))){
+                const url=canonical(m[0].replace(/[.,;]+$/,""));
+                if(url&&url.includes("/comments/")){
+                  found.set(url,{title:"Reddit caregiver discussion",url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_parallel_fallback"});
+                }
+              }
+            }catch{}
+          }
         }
       }
       return [...found.values()].slice(0,12);
