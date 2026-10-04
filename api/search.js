@@ -40,59 +40,52 @@ export default async function handler(req,res){
   const found=new Map();
 
   for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
-    const urls=[
-      "https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all",
-      "https://old.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all"
+    const baseQuery=encodeURIComponent(q);
+    const endpoints=[
+      "https://www.reddit.com/r/"+subreddit+"/search.json?q="+baseQuery+"&restrict_sr=1&sort=relevance&t=all&limit=12",
+      "https://old.reddit.com/r/"+subreddit+"/search.json?q="+baseQuery+"&restrict_sr=1&sort=relevance&t=all&limit=12"
     ];
-    let xml="";
-    for(const u of urls){
+    let parsed=null;
+    for(const u of endpoints){
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),7000);
       try{
         const rr=await fetch(u,{
           headers:{
-            "User-Agent":"Mozilla/5.0 (compatible; CareWisdomResearch/1.0; +https://care-wisdom.vercel.app)",
-            "Accept":"application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+            "User-Agent":"CareWisdomResearch/1.0 (public research discovery)",
+            "Accept":"application/json"
           },
           signal:controller.signal
         });
         if(rr.ok){
-          const candidate=await rr.text();
-          if(candidate.includes("<entry>")){ xml=candidate; break; }
+          const candidate=await rr.json();
+          if(candidate?.data?.children){ parsed=candidate; break; }
         }
       }catch{}finally{
         clearTimeout(timer);
       }
     }
-    if(!xml) continue;
+    if(!parsed) continue;
     try{
-      const entries=xml.split("<entry>").slice(1);
-
-      for(const block of entries){
-        const linkMatch=block.match(/<link href="([^"]+)"/i);
-        const rawUrl=linkMatch?.[1]||"";
-        if(!/reddit\.com\/r\/[^/]+\/comments\//i.test(rawUrl)) continue;
-        const url=canonical(rawUrl);
+      for(const child of parsed.data.children||[]){
+        const d=child?.data||{};
+        const permalink=String(d.permalink||"");
+        if(!/^\/r\/[^/]+\/comments\/[^/?#]+/i.test(permalink)) continue;
+        const url=canonical("https://www.reddit.com"+permalink);
         if(!url) continue;
-
-        const titleMatch=block.match(/<title>([\\s\\S]*?)<\/title>/i);
-        const contentMatch=block.match(/<content[^>]*>([\\s\\S]*?)<\/content>/i);
-        const title=decodeXml(titleMatch?.[1]||"Reddit caregiver discussion");
-        const rawContent=decodeXml(contentMatch?.[1]||"");
-
+        const title=String(d.title||"Reddit caregiver discussion");
+        const body=String(d.selftext||"").trim();
         found.set(url,{
           title,
           url,
           domain:"reddit.com",
-          published_date:null,
-          excerpts:rawContent ? [stripHtml(rawContent).slice(0,1800)] : [],
+          published_date:d.created_utc?new Date(d.created_utc*1000).toISOString():null,
+          excerpts:body ? [body.slice(0,1800)] : [title],
           type:"community",
-          discovery_method:"reddit_rss"
+          discovery_method:"reddit_json"
         });
       }
-    }catch{}finally{
-      clearTimeout(timer);
-    }
+    }catch{}
   }
   return [...found.values()].slice(0,12);
 }
