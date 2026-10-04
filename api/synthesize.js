@@ -40,6 +40,13 @@ export default async function handler(req, res) {
 
 
 
+    const focusEvidenceExcerpt = (excerpt, words) => {
+      const t=String(excerpt||"").replace(/\s+/g," ").trim();
+      const sentences=t.split(/(?<=[.!?])\s+/);
+      const hits=sentences.filter(s => words.some(w => s.toLowerCase().includes(String(w).toLowerCase())));
+      return (hits.length ? hits.slice(0,2).join(" ") : t).slice(0,420);
+    };
+
     const addPattern = (title, words, questionList, rabbitHoles) => {
       const matching = sources.filter(s => s && has(s, words));
       if (!matching.length) return;
@@ -60,14 +67,18 @@ export default async function handler(req, res) {
       const excerpts = exp
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
         .filter(x => isCleanEvidenceExcerpt(x, words))
-        .slice(0, 2)
-        .map(x => String(x).replace(/\s+/g, " ").slice(0, 300));
+        .slice(0, 3)
+        .map(x => focusEvidenceExcerpt(x, words))
+        .filter(Boolean)
+        .slice(0, 2);
 
       const clinicalExcerpts = clin
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
         .filter(x => words.some(w => String(x).toLowerCase().includes(w)))
-        .slice(0, 2)
-        .map(x => String(x).replace(/\s+/g, " ").slice(0, 300));
+        .slice(0, 3)
+        .map(x => focusEvidenceExcerpt(x, words))
+        .filter(Boolean)
+        .slice(0, 2);
 
       const repeated = exp.length >= 2 && domains.length >= 2;
 
