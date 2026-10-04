@@ -14,7 +14,7 @@ main{max-width:1120px;margin:28px auto;padding:0 20px}.layout{display:grid;grid-
 .thread-context{background:#eef3f5;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.thread-context b{color:#527082;text-transform:uppercase;letter-spacing:.07em;font-size:11px}.thread-context span{color:var(--muted)}</style></head>
 <body>
 <header><div class="hero"><div class="brand">CARE WISDOM</div><h1>Practical experience, turned into better questions.</h1><p>Find recurring caregiver and patient experiences, then separate them from clinical context and uncertainty. Anecdotes are discovery evidence — not medical advice.</p>
-<div class="search"><div class="searchbox"><textarea id="q" aria-label="Research question" maxlength="20000" rows="2">Parkinson's toileting assistance with Hoyer lift</textarea><div id="queryMeta" class="query-meta" aria-live="polite">0 / 20,000</div></div><button class="btn" id="searchBtn">Search live</button></div></div></header>
+<div class="search"><div class="searchbox"><textarea id="q" aria-label="Research question" maxlength="20000" rows="2">Parkinson's toileting assistance with Hoyer lift</textarea><div id="queryMeta" class="query-meta" aria-live="polite">0 / 20,000</div></div><button class="btn" id="searchBtn">New research</button><button class="btn" id="followBtn" style="display:none;background:#e8eef1;color:#36515e">Follow up</button></div></div></header>
 <main><div class="layout"><section><div class="card"><div class="status"><h2>Research patterns</h2><span id="status" class="muted">Ready.</span></div><div id="results"><div class="empty">Ask a messy real-life question. Care Wisdom will look for recurring lived-experience patterns, disagreement, and clinical context.</div></div></div></section>
 <aside>
 <div class="card danger"><h3>Safety first</h3><p class="muted">Care Wisdom does not diagnose or prescribe. If a question involves fainting/near-fainting, falls, acute confusion, choking or breathing trouble, or medication changes, the app highlights the need for clinical evaluation rather than turning anecdotes into instructions.</p></div>
@@ -40,10 +40,11 @@ function render(d){
  html+=`<div class="mini" style="margin-top:18px"><b>Full source trail</b><div class="sources">${(d.sources||[]).map(sourceHtml).join('')}</div></div>`;
  $('results').innerHTML=html||'<div class="empty">No synthesis could be formed from the research.</div>';
 }
-let researchThread={rootQuestion:'',turns:[]};
-async function search(){
+let researchThread={rootQuestion:'',turns:[],followMode:false};
+async function search(mode){
  const followup=$('q').value.trim(); if(!followup)return;
- const isFollowup=!!researchThread.rootQuestion;
+ const isFollowup=mode==='follow' && !!researchThread.rootQuestion;
+ if(!isFollowup) researchThread={rootQuestion:'',turns:[],followMode:false};
  const q=isFollowup
    ? researchThread.rootQuestion+"\n\nFOLLOW-UP QUESTION: "+followup+"\n\nConversation so far:\n"+researchThread.turns.slice(-4).map(t=>t.role+": "+t.text).join("\n")
    : followup;
@@ -70,6 +71,8 @@ async function search(){
     label.innerHTML='<b>Research thread</b><span>Continuing from: '+esc(researchThread.rootQuestion)+'</span>';
     $('results').insertBefore(label,$('results').firstChild);
   }
+  $('followBtn').style.display='inline-block';
+  $('followBtn').textContent='Follow up on this research';
   if(out.safety_flags?.length)$('results').insertAdjacentHTML('afterbegin','<div class="mini danger" style="margin-bottom:18px"><b>Clinical safety flag</b>'+esc(out.safety_flags.join(' '))+'</div>');
  }catch(e){
   $('status').textContent='Research error';
@@ -88,10 +91,11 @@ function updateQueryMeta(){
  resizeQuery();
 }
 $('q').addEventListener('input',updateQueryMeta);
-$('searchBtn').addEventListener('click',search);
-$('q').placeholder='Ask a research question — or ask a follow-up about the results';
+$('searchBtn').addEventListener('click',()=>search('new'));
+$('followBtn').addEventListener('click',()=>search('follow'));
+$('q').placeholder='Ask a new research question — or click Follow up to continue this thread';
 $('q').addEventListener('keydown',e=>{
- if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();search();}
+ if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();search('new');}
 });
 updateQueryMeta();
 
