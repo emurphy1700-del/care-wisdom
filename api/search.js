@@ -191,17 +191,47 @@ export default async function handler(req,res){
 }
 
 function buildQueries(q){
-  return [
+  const lower=q.toLowerCase();
+  const queries=[
     q,
-    q+" Parkinson's caregiver firsthand experience what helped",
-    "site:agingcare.com Parkinson's physical therapy rehabilitation caregiver experience",
-    "site:reddit.com/r/Parkinsons Parkinson's physical therapy rehabilitation progress caregiver",
-    "site:myparkinsons.org Parkinson's caregiver forum physical therapy rehabilitation",
-    "Parkinson's caregiver forum rehabilitation stalled progress physical therapy",
-    q+" Parkinson's orthostatic hypotension medication timing fatigue rehabilitation",
-    q+" Parkinson's physical therapy clinical guideline systematic review",
-    "Parkinson's rehabilitation nursing home caregiver experience"
-  ].map(x=>x.slice(0,240));
+    q+" caregiver firsthand experience what helped",
+    q+" caregiver what worked what didn't work",
+    q+" patient caregiver stuck getting out of chair",
+    q+" freezing getting out of chair caregiver",
+    q+" Parkinson's freezing sit to stand caregiver",
+    q+" Parkinson's freezing recliner caregiver",
+    q+" Parkinson's freezing transfer caregiver",
+    q+" Parkinson's freezing visual cue counting music caregiver",
+    "site:reddit.com/r/Parkinsons freezing chair stand caregiver",
+    "site:reddit.com/r/Parkinsons freezing getting up caregiver",
+    "site:reddit.com/r/Parkinsons sit to stand Parkinson's caregiver",
+    "site:agingcare.com/questions Parkinson's freezing chair caregiver",
+    "site:agingcare.com/questions Parkinson's getting out of chair caregiver",
+    "site:agingcare.com/questions Parkinson's transfer freezing caregiver",
+    "site:agingcare.com/questions Parkinson's stuck chair caregiver",
+    "Parkinson's freezing caregiver discussion what helped",
+    "Parkinson's freezing caregiver discussion what didn't work",
+    "Parkinson's external cueing caregiver experience",
+    "Parkinson's freezing rehabilitation caregiver experience",
+    q+" Parkinson's physical therapy clinical guideline systematic review"
+  ];
+  // For non-freezing questions, keep the broad structure but still search
+  // for the user's actual wording and negative experiences.
+  if(!/freez|chair|stand|transfer|cue|getting out/.test(lower)){
+    return [
+      q,
+      q+" caregiver firsthand experience what helped",
+      q+" caregiver what didn't work",
+      q+" patient experience discussion",
+      "site:agingcare.com/questions "+q+" caregiver",
+      "site:reddit.com/r/Parkinsons "+q+" caregiver",
+      "site:reddit.com/r/Parkinsons "+q+" what helped",
+      "site:agingcare.com/questions Parkinson's "+q,
+      "Parkinson's caregiver discussion "+q,
+      "Parkinson's clinical evidence "+q
+    ].map(x=>x.slice(0,240));
+  }
+  return queries.map(x=>x.slice(0,240));
 }
 function buildBranches(q){
   const lower=q.toLowerCase();
