@@ -18,7 +18,7 @@ function safetyFlags(q){
     flags.push("Medication changes should be made with the prescribing clinician or pharmacist, not from anecdotal reports.");
   return flags;
 }
-\nexport default async function handler(req,res){
+export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
  if(!process.env.PARALLEL_API_KEY)return res.status(503).json({error:"Provider not configured"});
  try{
@@ -87,4 +87,4 @@ function safetyFlags(q){
     domains
   };
   return res.status(200).json({...result,question:result.question||q,sources,source_stats});
- }catch(e){return res.status(500).json({error:"Synthesis failed",detail:String(e).slice(0,700)})}
+ }catch(e){console.error("Synthesis failed:",e);return res.status(500).json({error:"Synthesis failed",detail:String(e?.stack||e).slice(0,1200)})}
