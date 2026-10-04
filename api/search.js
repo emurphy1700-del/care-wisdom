@@ -75,8 +75,12 @@ export default async function handler(req,res){
         [
           "site:reddit.com/r/Parkinsons "+q,
           "site:reddit.com/r/ParkinsonsCaregivers "+q,
-          "site:reddit.com/r/Parkinsons \"freezing\" \"chair\"",
-          "site:reddit.com/r/ParkinsonsCaregivers \"freezing\" \"chair\""
+          "site:reddit.com/r/Parkinsons freezing chair",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing chair",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing transfers",
+          "site:reddit.com/r/Parkinsons freezing transfers",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing sit to stand",
+          "site:reddit.com/r/Parkinsons stuck getting up"
         ],
         10,
         ["reddit.com"]
