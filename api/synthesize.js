@@ -67,10 +67,21 @@ export default async function handler(req, res) {
       const excerpts = exp
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
         .filter(x => isCleanEvidenceExcerpt(x, words))
-        .slice(0, 3)
+        .slice(0, 4)
         .map(x => focusEvidenceExcerpt(x, words))
         .filter(Boolean)
         .slice(0, 2);
+
+      // If extraction is too thin, preserve the firsthand source signal rather
+      // than telling the user that no report exists. We deliberately describe
+      // this as a report/discussion, not as proof that an intervention worked.
+      const fallbackReports = exp
+        .filter(s => !excerpts.length || !Array.isArray(s.excerpts) || !s.excerpts.length)
+        .slice(0, 3)
+        .map(s => {
+          const title = String(s.title || "Caregiver discussion").trim();
+          return title + " — firsthand discussion relevant to this question.";
+        });
 
       const clinicalExcerpts = clin
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
@@ -94,9 +105,11 @@ export default async function handler(req, res) {
         },
         what_people_reported: excerpts.length
           ? excerpts.map(x => "“" + x + "”").join(" ")
-          : exp.length
-            ? "Firsthand or public-reporting sources discuss this theme, but the available extracts are too thin for a stronger summary."
-            : "No qualifying firsthand report was found for this specific theme.",
+          : fallbackReports.length
+            ? fallbackReports.join(" ")
+            : exp.length
+              ? "Firsthand sources were found, but the page extracts were too thin to safely summarize what was reported."
+              : "No qualifying firsthand report was found for this specific theme.",
         evidence_check: clinicalExcerpts.length
           ? clinicalExcerpts.map(x => "“" + x + "”").join(" ")
           : clin.length
