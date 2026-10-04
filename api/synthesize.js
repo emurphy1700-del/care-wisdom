@@ -30,16 +30,30 @@ export default async function handler(req, res) {
         source.title || "",
         ...(Array.isArray(source.excerpts) ? source.excerpts : [])
       ].join(" ").toLowerCase();
-      const pd = /parkinson|parkinsonism|pd\b/.test(text);
-      const freezing = /freez|frozen|stuck|couldn.?t move|unable to move/.test(text);
-      const transfer = /chair|recliner|seat|sit.?to.?stand|stand up|get(ting)? up|transfer|bathroom|walker|walking|gait/.test(text);
-      // This source has already passed the search layer's firsthand/community
-      // gate. Do not require the excerpt itself to repeat "Parkinson's" or a
-      // caregiver identity phrase: real firsthand posts often use ordinary
-      // language ("he gets stuck getting up from the recliner").
-      // The synthesis gate therefore checks the two substantive concepts only:
-      // freezing/stuck + a concrete transfer/mobility context.
-      return freezing && transfer;
+
+      // Match firsthand reports to the actual question rather than using a
+      // hard-coded freezing/transfer gate for every Parkinson's query.
+      const groups = [];
+      if (/freez|stuck|chair|recliner|sit[- ]?to[- ]stand|getting out|get(ting)? up|transfer/.test(q)) {
+        groups.push(/freez|frozen|stuck|couldn.?t move|unable to move/);
+        groups.push(/chair|recliner|seat|sit.?to.?stand|stand up|get(ting)? up|transfer|bathroom|walker|walking|gait/);
+      }
+      if (/rehab|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|not making progress|skilled nursing|snf/.test(q)) {
+        groups.push(/rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|therapy session|therapist/);
+        groups.push(/progress|plateau|improv|declin|stalled|not making|unable|difficulty|barrier|goal/);
+      }
+      if (/blood pressure|orthostatic|hypotension|faint|near[- ]?faint|dizzy|lightheaded|syncope/.test(q)) {
+        groups.push(/blood pressure|orthostatic|hypotension|faint|near[- ]?faint|dizz|lightheaded|syncope|passed out/);
+      }
+      if (/toilet|toileting|bathroom|commode/.test(q)) {
+        groups.push(/toilet|toileting|bathroom|commode/);
+      }
+
+      if (!groups.length) return true;
+      // A firsthand record should address at least two substantive aspects of
+      // the actual question. We intentionally do not require it to repeat
+      // "Parkinson's" because people often rely on conversation context.
+      return groups.filter(re => re.test(text)).length >= Math.min(2, groups.length);
     };
     const journalism = sources.filter(s => s && s.type === "journalism");
 
@@ -205,6 +219,24 @@ export default async function handler(req, res) {
       });
     };
 
+    // Rehabilitation/PT questions need their own synthesis path. Do not
+    // force them through the freezing library just because "standing" or
+    // "getting up" appears in a rehab description.
+    if (/(rehab|rehabilitation|physical therapy|\\bpt\\b|occupational therapy|\\bot\\b|not making progress|plateau|stalled|skilled nursing|snf)/i.test(q)) {
+      addPattern(
+        "Progress in rehabilitation needs to be judged by specific functional goals",
+        ["progress","goal","improv","rehab","therapy","physical"],
+        ["What specific functional goal is PT trying to improve, and what measurable change would count as progress?", "Is performance being measured across the day and during ordinary care—not only during the therapy session?", "What is preventing the patient from participating consistently enough to assess progress?"],
+        ["Functional goals and measures", "Performance outside therapy", "Barriers to participation"]
+      );
+      addPattern(
+        "Parkinson's symptoms and other clinical factors can affect rehabilitation participation",
+        ["parkinson","orthostatic","blood pressure","fatigue","dizzy","freez","weakness","medication"],
+        ["What symptoms or physiologic changes are limiting participation in therapy?", "Has the team considered whether blood-pressure changes, freezing, fatigue, medication timing, pain, or other symptoms are affecting performance?", "Which clinician should evaluate the limiting symptom before the therapy plan is changed?"],
+        ["Orthostatic symptoms", "Motor fluctuations/freezing", "Medication timing and fatigue"]
+      );
+    }
+
     // Only use the freezing/transfer pattern library when the question
     // explicitly asks about that problem. Generic words such as "standing"
     // or "getting up" can appear in many unrelated clinical questions
@@ -255,8 +287,9 @@ export default async function handler(req, res) {
         if(!s || s.type !== "community" || used.has(s.url)) return false;
         if(communityRelevantToQuestion(s)) return true;
         const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
+        const relevanceWords = /rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|improv|stalled|goal|freez|frozen|stuck|chair|recliner|transfer|stand|get(ting)? up|blood pressure|orthostatic|hypotension|faint|dizz|lightheaded|toilet|toileting|bathroom|commode/;
         return excerpts.some(e =>
-          isCleanEvidenceExcerpt(e, ["freez","frozen","stuck","chair","recliner","transfer","stand","getting up"])
+          isCleanEvidenceExcerpt(e, String(e).match(relevanceWords) ? [String(e).match(relevanceWords)[0]] : [])
         );
       })
       .slice(0, 5)
