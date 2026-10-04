@@ -261,29 +261,27 @@ function guessType(url,title){
 function isQuestionRelevant(source, question, minHits=1){
   const q=String(question||"").toLowerCase();
   const text=[source.title||"",source.url||"",...(source.excerpts||[])].join(" ").toLowerCase();
-  const combined=q+" "+text;
 
-  // Match concepts, not exact words. People describe the same event differently
-  // ("gets stuck rising from the recliner" vs. "freezes getting out of a chair").
   const groups=[
     ["freezing","freeze","freezes","frozen","stuck","gets stuck","can't move","cannot move","feet won't move"],
     ["chair","recliner","seat","sitting","sit to stand","stand up","rising","getting up","rise from"],
     ["transfer","mobility","walking","gait","movement","move","steps","standing"],
     ["cue","cueing","count","countdown","music","rhythm","visual","verbal","march","rock"],
+    ["parkinson","parkinson's","parkinsonism","pd"],
     ["caregiver","carepartner","care partner","husband","wife","mother","father","mom","dad","patient"]
   ];
 
-  const questionGroups=groups.filter(g=>g.some(term=>q.includes(term)));
-  if(!questionGroups.length) return true;
+  const active=groups.filter(g=>g.some(term=>q.includes(term)));
+  if(!active.length) return true;
 
   let hits=0;
-  for(const g of questionGroups){
-    if(g.some(term=>combined.includes(term))) hits++;
+  for(const g of active){
+    if(g.some(term=>text.includes(term))) hits++;
   }
 
-  // For clinical/public context, one strong problem-specific concept plus
-  // a relevant disease/context term is enough. For firsthand sources,
-  // require two matching concepts so generic caregiving pages stay out.
+  // For community sources, require two distinct concepts from the question.
+  // This prevents unrelated caregiver Q&A from qualifying merely because it
+  // happens to be on AgingCare or another discussion site.
   return hits >= minHits;
 }
 
