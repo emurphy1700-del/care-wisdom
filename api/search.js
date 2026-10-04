@@ -271,7 +271,7 @@ function isUsefulFirsthand(x){
   if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\/[^/?#]+/.test(String(x.url||""));
   if(x.domain==="agingcare.com") {
     const u=String(x.url||"").toLowerCase();
-    return /\/questions\/[^/?#]+-\d+\.htm(?:[?#].*)?$/.test(u)
+    return /\/questions\/(?:[^/?#]+-)?\d+(?:\.htm)?(?:[?#].*)?$/.test(u)
       && !/\/topics\/|\/caregiver-forum/.test(u);
   }
   // Generic sites must contain evidence of an actual person's experience,
