@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       return (hits.length ? hits.slice(0,2).join(" ") : t).slice(0,420);
     };
 
-    const addPattern = (title, words, questionList, rabbitHoles, sourceMatcher = null) => {
+    const addPattern = (title, words, questionList, rabbitHoles, sourceMatcher = null, clinicalWords = null) => {
       const matching = sourceMatcher
         ? sources.filter(s => s && sourceMatcher(s))
         : sources.filter(s => s && (s.type === "community" ? communityRelevantToQuestion(s) && has(s, words) : has(s, words)));
@@ -142,10 +142,11 @@ export default async function handler(req, res) {
         })
         .filter(({sentence}) => {
           const lower = sentence.toLowerCase();
-          const hits = words.filter(w => lower.includes(String(w).toLowerCase())).length;
-          // Require substantive clinical relevance, not just a shared disease
-          // word or a generic mention of freezing.
-          const substantive = /(freez|transfer|sit.?to.?stand|standing|gait|fall|cue|rehab|physical therapy|occupational therapy|mobility)/i.test(lower);
+          const evidenceWords = Array.isArray(clinicalWords) && clinicalWords.length ? clinicalWords : words;
+          const hits = evidenceWords.filter(w => lower.includes(String(w).toLowerCase())).length;
+          // Require substantive clinical relevance to THIS pattern, not merely
+          // a shared disease word or a generic therapy/freezing mention.
+          const substantive = /(freez|transfer|sit.?to.?stand|standing|gait|fall|cue|rehab|physical therapy|occupational therapy|mobility|functional|outcome|goal|measure|progress|participat|orthostatic|blood pressure|hypotension|dizz|lightheaded|fatigue|medication|symptom|pain|weakness)/i.test(lower);
           return hits >= Math.min(2, Math.max(1, words.length)) && substantive;
         })
         .map(({sourceTitle, sentence}) => focusEvidenceExcerpt(sentence, words))
@@ -227,13 +228,17 @@ export default async function handler(req, res) {
         "Progress in rehabilitation needs to be judged by specific functional goals",
         ["progress","goal","improv","rehab","therapy","physical"],
         ["What specific functional goal is PT trying to improve, and what measurable change would count as progress?", "Is performance being measured across the day and during ordinary care—not only during the therapy session?", "What is preventing the patient from participating consistently enough to assess progress?"],
-        ["Functional goals and measures", "Performance outside therapy", "Barriers to participation"]
+        ["Functional goals and measures", "Performance outside therapy", "Barriers to participation"],
+        null,
+        ["functional","outcome","goal","measure","progress","gait","walking","balance","mobility","activities of daily living"]
       );
       addPattern(
         "Parkinson's symptoms and other clinical factors can affect rehabilitation participation",
         ["parkinson","orthostatic","blood pressure","fatigue","dizzy","freez","weakness","medication"],
         ["What symptoms or physiologic changes are limiting participation in therapy?", "Has the team considered whether blood-pressure changes, freezing, fatigue, medication timing, pain, or other symptoms are affecting performance?", "Which clinician should evaluate the limiting symptom before the therapy plan is changed?"],
-        ["Orthostatic symptoms", "Motor fluctuations/freezing", "Medication timing and fatigue"]
+        ["Orthostatic symptoms", "Motor fluctuations/freezing", "Medication timing and fatigue"],
+        null,
+        ["orthostatic","blood pressure","hypotension","dizziness","lightheaded","freezing","fatigue","medication","symptom","participation","rehabilitation","therapy"]
       );
     }
 
