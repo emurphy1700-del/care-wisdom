@@ -325,8 +325,9 @@ function extractResults(data){
 }
 function cleanEvidenceText(value){
   let s=String(value||"");
-  s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,"$1");
+  s=s.replace(/\[([^\]]+)\]\((?:https?:\/\/|\/)[^)]*\)/g,"$1");
   s=s.replace(/https?:\/\/[^\s)]+/g,"");
+  s=s.replace(/\*\*([^*]+)\*\*/g,"$1");
   s=s.replace(/^\s*#{1,6}\s*/gm,"");
   s=s.replace(/\s+/g," ").trim();
   return s;
