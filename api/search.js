@@ -34,6 +34,31 @@ export default async function handler(req,res){
       return extractResults(data);
     }
 
+    async function discoverRedditViaSearchPages(question){
+      const lower=String(question||"").toLowerCase();
+      const terms=[question,/freez|stuck/.test(lower)?"freezing transfers":question,/chair|sit to stand|get(ting)? up/.test(lower)?"chair sit to stand":question];
+      const found=new Map();
+      for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
+        for(const term of terms){
+          const u="https://www.reddit.com/r/"+subreddit+"/search/?q="+encodeURIComponent(term)+"&restrict_sr=1&sort=relevance&t=all";
+          try{
+            const fr=await fetch("https://api.parallel.ai/v1/fetch",{method:"POST",headers:{"x-api-key":process.env.PARALLEL_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({urls:[u],objective:"Recover individual Reddit discussion links directly relevant to the research question. Return individual /comments/ links and titles; ignore subreddit landing pages.",full_content:false,allow_live_fetch:true})});
+            const raw=await fr.text(); if(!fr.ok) continue;
+            let data; try{data=JSON.parse(raw)}catch{continue}
+            for(const page of (data.results||[])){
+              const text=(page.excerpts||[]).join("\n");
+              const re=/\[([^\]]{3,240})\]\((https?:\/\/www\.reddit\.com\/r\/[^)]+\/comments\/[^)]+)\)/g; let m;
+              while((m=re.exec(text))){
+                const url=canonical(m[2]); if(!url||!url.includes("/comments/")) continue;
+                found.set(url,{title:m[1].replace(/\\/g,"").trim(),url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
+              }
+            }
+          }catch{}
+        }
+      }
+      return [...found.values()].slice(0,12);
+    }
+
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
     // Use the targeted discovery queries built above for the lived-experience
@@ -55,6 +80,7 @@ export default async function handler(req,res){
     ];
 
     const searches=[
+      discoverRedditViaSearchPages(q),
       providerSearch(
         "Find FIRSTHAND patient or caregiver discussions about the specific caregiving problem. Prioritize discussion threads and Q&A where an individual describes what happened, what was tried, and what the outcome was. Prefer AgingCare, Reddit Parkinson's communities, Parkinson's forums, and other patient/caregiver discussion communities. Do NOT return general medical guides, clinic marketing, or generic educational pages unless needed as a last resort.",
         communityQueries,
@@ -96,7 +122,7 @@ export default async function handler(req,res){
       )
     ];
     const settled=await Promise.allSettled(searches);
-    const [communityResults,clinicalResults,generalResults,redditResults,aarpResults]=settled.map(x=>x.status==="fulfilled"?x.value:[]);
+    const [redditDiscoveryResults,communityResults,clinicalResults,generalResults,redditResults,aarpResults]=settled.map(x=>x.status==="fulfilled"?x.value:[]);
     let recoveryResults=[];
     let recoveryAttempts=0;
     // Adaptive recovery: if the provider did not return any Reddit/community
