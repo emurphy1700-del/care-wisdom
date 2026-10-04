@@ -40,11 +40,30 @@ export default async function handler(req, res) {
 
 
 
+    const sourceDirectlyAnswersQuestion = (source, question) => {
+      const text=[source.title||"",...(Array.isArray(source.excerpts)?source.excerpts:[])].join(" ").toLowerCase();
+      const q=String(question||"").toLowerCase();
+      const groups=[
+        ["freezing","freeze","freezes","frozen","stuck","gets stuck","can't move","cannot move"],
+        ["chair","recliner","seat","sitting","sit to stand","stand up","standing","rising","getting up","rise from"],
+        ["transfer","transfer","mobility","gait","walking"],
+        ["cue","cueing","count","countdown","music","rhythm","visual","verbal","march","rock"]
+      ];
+      const active=groups.filter(g=>g.some(x=>q.includes(x)));
+      if(!active.length) return true;
+      const hits=active.filter(g=>g.some(x=>text.includes(x))).length;
+      // For a specific multi-part question, require at least two of its
+      // substantive concepts in the firsthand passage.
+      return hits >= Math.min(2, active.length);
+    };
+
     const addPattern = (title, words, questionList, rabbitHoles) => {
       const matching = sources.filter(s => s && has(s, words));
       if (!matching.length) return;
 
-      const exp = matching.filter(s => s.type === "community");
+      const exp = matching.filter(s =>
+        s.type === "community" && sourceDirectlyAnswersQuestion(s, q)
+      );
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
