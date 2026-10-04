@@ -40,16 +40,32 @@ export default async function handler(req,res){
   const found=new Map();
 
   for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
-    const u="https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all";
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),5000);
+    const urls=[
+      "https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all",
+      "https://old.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all"
+    ];
+    let xml="";
+    for(const u of urls){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),7000);
+      try{
+        const rr=await fetch(u,{
+          headers:{
+            "User-Agent":"Mozilla/5.0 (compatible; CareWisdomResearch/1.0; +https://care-wisdom.vercel.app)",
+            "Accept":"application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+          },
+          signal:controller.signal
+        });
+        if(rr.ok){
+          const candidate=await rr.text();
+          if(candidate.includes("<entry>")){ xml=candidate; break; }
+        }
+      }catch{}finally{
+        clearTimeout(timer);
+      }
+    }
+    if(!xml) continue;
     try{
-      const rr=await fetch(u,{
-        headers:{"User-Agent":"CareWisdomResearch/1.0 (public research discovery)"},
-        signal:controller.signal
-      });
-      if(!rr.ok) continue;
-      const xml=await rr.text();
       const entries=xml.split("<entry>").slice(1);
 
       for(const block of entries){
