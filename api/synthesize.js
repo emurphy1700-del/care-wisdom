@@ -114,12 +114,19 @@ export default async function handler(req, res) {
             .filter(s => s.toLowerCase() !== titleLower)
             .filter(s => !/^(abstract|introduction|background|methods|results|conclusion|quick summary|affiliations?)\b/i.test(s))
             .filter(s => !/quick summary|management includes|sign in|create account|home|topics|resources|search|table of contents/i.test(s))
+            // Do not treat image captions, alt text, or figure descriptions as
+            // clinical evidence. These often describe a person in a photo rather
+            // than report a finding from the study.
+            .filter(s => !/^(man|woman|person|patient|patient[s']?)\s+(standing|sitting|walking|using|holding|shown|pictured)|using (a )?(crane|walker|cane|wheelchair) and holding|pictured|shown in (the )?(image|photo|figure)/i.test(s))
             .map(s => ({sourceTitle, sentence:s}));
         })
         .filter(({sentence}) => {
           const lower = sentence.toLowerCase();
           const hits = words.filter(w => lower.includes(String(w).toLowerCase())).length;
-          return hits >= Math.min(2, Math.max(1, words.length));
+          // Require substantive clinical relevance, not just a shared disease
+          // word or a generic mention of freezing.
+          const substantive = /(freez|transfer|sit.?to.?stand|standing|gait|fall|cue|rehab|physical therapy|occupational therapy|mobility)/i.test(lower);
+          return hits >= Math.min(2, Math.max(1, words.length)) && substantive;
         })
         .map(({sourceTitle, sentence}) => focusEvidenceExcerpt(sentence, words))
         .filter(Boolean)
