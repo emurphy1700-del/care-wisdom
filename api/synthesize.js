@@ -287,18 +287,93 @@ export default async function handler(req, res) {
     // enough to support a synthesized pattern. Do not compare the excerpt
     // against every word in the full question: ordinary caregiver language
     // often omits disease names and uses different phrasing.
+    // A "single report" is an auditable evidence item, not merely a community-domain
+    // result. It must have a real individual discussion URL, a meaningful title (or
+    // enough URL context to generate a neutral label), and an extracted firsthand
+    // passage. This prevents generic Reddit/site descriptions such as "The heart of
+    // the internet" from being presented as evidence.
+    const singleReportRelevanceWords = [];
+    if (/rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|stalled/i.test(q)) {
+      singleReportRelevanceWords.push("rehab","rehabilitation","physical therapy","therapy","progress","plateau","stalled","patient","caregiver");
+    }
+    if (/freez|stuck|chair|recliner|sit[- ]?to[- ]stand|getting out|get(ting)? up|transfer/i.test(q)) {
+      singleReportRelevanceWords.push("freez","frozen","stuck","chair","recliner","stand","getting up","transfer","walking","caregiver");
+    }
+    if (/blood pressure|orthostatic|hypotension|faint|near[- ]?faint|dizz|lightheaded|syncope/i.test(q)) {
+      singleReportRelevanceWords.push("blood pressure","orthostatic","hypotension","faint","dizzy","lightheaded","syncope","caregiver","patient");
+    }
+    if (/toilet|toileting|bathroom|commode/i.test(q)) {
+      singleReportRelevanceWords.push("toilet","toileting","bathroom","commode","caregiver","patient");
+    }
+    if (!singleReportRelevanceWords.length) singleReportRelevanceWords.push("caregiver","patient","experience","tried","helped","worked");
+
+    const genericReportTitles = new Set([
+      "the heart of the internet",
+      "reddit",
+      "reddit.com",
+      "home",
+      "search",
+      "caregiver forum",
+      "forum",
+      "discussion",
+      "untitled"
+    ]);
+
+    const isAuditableSingleReport = (s) => {
+      if (!s || s.type !== "community" || used.has(s.url)) return false;
+      const url=String(s.url||"");
+      if (!/^https?:\\/\\//i.test(url)) return false;
+      const lowerUrl=url.toLowerCase();
+      if (s.domain==="reddit.com" && !/\\/r\\/[^/]+\\/comments\\/[^/?#]+/i.test(url)) return false;
+      if (s.domain==="agingcare.com" && !/\\/questions\\/(?:[^/?#]+-)?\\d+(?:\\.htm)?(?:[?#].*)?$/i.test(lowerUrl)) return false;
+      if (!isUsefulFirsthand(s)) return false;
+      const title=String(s.title||"").replace(/\\s+/g," ").trim();
+      if (!title || genericReportTitles.has(title.toLowerCase()) || title.toLowerCase()===String(s.domain||"").toLowerCase()) return false;
+      const excerpts=Array.isArray(s.excerpts)?s.excerpts.map(x=>String(x||"").replace(/\\s+/g," ").trim()).filter(Boolean):[];
+      if (!excerpts.length) return false;
+      const clean=excerpts.find(e=>isCleanEvidenceExcerpt(e,singleReportRelevanceWords));
+      if (!clean) return false;
+      if (!communityRelevantToQuestion(s) && !isQuestionRelevantFallback(s,q)) return false;
+      return true;
+    };
+
+    // Keep the relevance fallback intentionally local to synthesis: the search
+    // endpoint already applied its evidence gates, but follow-up searches can
+    // surface slightly different wording. We still require substantive overlap.
+    const isQuestionRelevantFallback = (s, question) => {
+      const text=[s.title||"",...(Array.isArray(s.excerpts)?s.excerpts:[])].join(" ").toLowerCase();
+      const lower=String(question||"").toLowerCase();
+      const terms=[];
+      if(/rehab|physical therapy|\\bpt\\b|progress|plateau/i.test(lower)) terms.push(/rehab|physical therapy|\\bpt\\b|therapy/,/progress|plateau|stalled|improv|goal/);
+      if(/freez|stuck|chair|transfer|getting up/i.test(lower)) terms.push(/freez|stuck|chair|transfer|stand|get(ting)? up|walking/);
+      if(/blood pressure|orthostatic|faint|dizz/i.test(lower)) terms.push(/blood pressure|orthostatic|hypotension|faint|dizz|lightheaded|syncope/);
+      if(/toilet|bathroom|commode/i.test(lower)) terms.push(/toilet|bathroom|commode/);
+      return terms.length ? terms.some(re=>re.test(text)) : true;
+    };
+
+    const reportTitle = (s) => {
+      const title=String(s.title||"").replace(/\\s+/g," ").trim();
+      if (title && !genericReportTitles.has(title.toLowerCase()) && title.toLowerCase()!==String(s.domain||"").toLowerCase()) return title;
+      if (s.domain==="reddit.com") {
+        const m=String(s.url||"").match(/\\/r\\/([^/]+)\\/comments\\//i);
+        return m ? "Reddit discussion in r/"+m[1] : "Reddit discussion";
+      }
+      return String(s.domain||"Community discussion");
+    };
+
     const singleReports = sources
-      .filter(s => {
-        if(!s || s.type !== "community" || used.has(s.url)) return false;
-        if(communityRelevantToQuestion(s)) return true;
-        const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
-        const relevanceWords = /rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|improv|stalled|goal|freez|frozen|stuck|chair|recliner|transfer|stand|get(ting)? up|blood pressure|orthostatic|hypotension|faint|dizz|lightheaded|toilet|toileting|bathroom|commode/;
-        return excerpts.some(e =>
-          isCleanEvidenceExcerpt(e, String(e).match(relevanceWords) ? [String(e).match(relevanceWords)[0]] : [])
-        );
-      })
+      .filter(isAuditableSingleReport)
       .slice(0, 5)
-      .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
+      .map(s => {
+        const excerpt=(s.excerpts||[]).find(e=>isCleanEvidenceExcerpt(e,singleReportRelevanceWords)) || s.excerpts?.[0] || "";
+        return {
+          title: reportTitle(s),
+          url: String(s.url),
+          domain: String(s.domain||"community source"),
+          reason: "Individual firsthand report; not enough independent evidence to call it a recurring pattern.",
+          excerpt: focusEvidenceExcerpt(excerpt,singleReportRelevanceWords).slice(0,420)
+        };
+      });
 
     const domains = [...new Set(sources.map(s => s && s.domain).filter(Boolean))];
 
