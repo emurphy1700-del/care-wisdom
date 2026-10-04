@@ -83,12 +83,11 @@ export default async function handler(req,res){
       providerSearch(
         "Return ONLY AARP articles relevant to this caregiving question, preferably firsthand caregiver stories or practical reporting about Parkinson's, rehabilitation, physical therapy, hospital-to-rehab transitions, mobility, or caregiving. Do not return non-AARP pages.",
         [
-          "site:aarp.org/caregiving "+q,
-          "site:aarp.org/caregiving Parkinson's rehabilitation caregiver",
-          "site:aarp.org/caregiving Parkinson's physical therapy caregiver"
+          q+" caregiver experience physical therapy",
+          q+" patient caregiver story what helped"
         ],
-        10,
-        ["aarp.org"]
+        8,
+        []
       )
     ];
     const settled=await Promise.allSettled(searches);
@@ -112,13 +111,13 @@ export default async function handler(req,res){
     // generic topic hubs, or unrelated "other" results. Care Wisdom would rather
     // return 9 good sources than 18 impressive-looking but irrelevant ones.
     const reddit=community.filter(x=>x.domain==="reddit.com");
-    const aarp=journalism.filter(x=>x.domain==="aarp.org");
+    // Build the pool in evidence order. Firsthand discussions get priority;
+    // clinical context comes next; journalism is supplementary context.
     const selected=diversifyByDomain([
       ...reddit,
       ...community,
-      ...aarp,
-      ...journalism,
-      ...clinical
+      ...clinical,
+      ...journalism
     ],18);
 
     // Second stage: retrieve focused passages from the actual pages.
@@ -228,7 +227,9 @@ function isUsefulFirsthand(x){
   if(bad)return false;
   if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\//.test(String(x.url||""));
   if(x.domain==="agingcare.com") return /\/questions\/[^/]+\.htm/.test(String(x.url||""));
-  return /(forum|question|discussion|caregiver|patient|my (mom|dad|mother|father|husband|wife)|we found|i found|in my experience|what helped|tried)/.test(h);
+  // Generic sites must contain evidence of an actual person's experience,
+  // not merely the word "caregiver" in an article title.
+  return /(forum|question|discussion|my (mom|dad|mother|father|husband|wife|partner)|we found|i found|in my experience|our experience|what helped us|what worked for us|we tried|i tried)/.test(h);
 }
 function isUsefulPublicReporting(x){
   const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
@@ -245,18 +246,25 @@ function guessType(url,title){
 
 
 function diversifyByDomain(items,max){
-  const out=[],used=new Set();
-  // First pass: one result per domain, preserving the evidence-class priority above.
+  const out=[],counts=new Map(),seen=new Set();
+  // First pass: maximize source-domain diversity, with a hard cap of 2
+  // records from any one domain.
   for(const x of items){
     if(out.length>=max)break;
-    if(!x.domain||used.has(x.domain))continue;
-    used.add(x.domain);out.push(x);
+    const key=canonical(x.url);
+    if(!key||seen.has(key)||!x.domain)continue;
+    const count=counts.get(x.domain)||0;
+    if(count>=2)continue;
+    seen.add(key); counts.set(x.domain,count+1); out.push(x);
   }
-  // Second pass: fill remaining slots when a domain has multiple genuinely useful pages.
+  // Second pass: fill only with genuinely new domains/pages, still capped at 2.
   for(const x of items){
     if(out.length>=max)break;
-    if(out.some(y=>canonical(y.url)===canonical(x.url)))continue;
-    out.push(x);
+    const key=canonical(x.url);
+    if(!key||seen.has(key))continue;
+    const count=counts.get(x.domain)||0;
+    if(count>=2)continue;
+    seen.add(key); counts.set(x.domain,count+1); out.push(x);
   }
   return out;
 }
