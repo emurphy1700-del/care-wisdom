@@ -323,7 +323,15 @@ function extractResults(data){
   const candidates=data?.results||data?.search_results||data?.items||data?.data||[];
   return Array.isArray(candidates)?candidates:[];
 }
-function cleanEvidenceText(value){\n  let s=String(value||"");\n  s=s.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)]+)\\)/g,"$1");\n  s=s.replace(/https?:\\/\\/[^\\s)]+/g,"");\n  s=s.replace(/^\\s*#{1,6}\\s*/gm,"");\n  s=s.replace(/\\s+/g," ").trim();\n  return s;\n}\nfunction normalizeResult(x){
+function cleanEvidenceText(value){
+  let s=String(value||"");
+  s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,"$1");
+  s=s.replace(/https?:\/\/[^\s)]+/g,"");
+  s=s.replace(/^\s*#{1,6}\s*/gm,"");
+  s=s.replace(/\s+/g," ").trim();
+  return s;
+}
+function normalizeResult(x){
   const url=x?.url||x?.link||x?.source_url||"";
   const title=x?.title||x?.name||url;
   const excerpts=Array.isArray(x?.excerpts)?x.excerpts:(typeof x?.excerpt==="string"?[x.excerpt]:typeof x?.snippet==="string"?[x.snippet]:[]);
