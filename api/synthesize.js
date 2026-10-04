@@ -23,6 +23,18 @@ export default async function handler(req, res) {
 
     const community = sources.filter(s => s && s.type === "community");
     const clinical = sources.filter(s => s && (s.type === "clinical" || s.type === "patient_org"));
+
+    const communityRelevantToQuestion = (source) => {
+      if (!source || source.type !== "community") return false;
+      const text = [
+        source.title || "",
+        ...(Array.isArray(source.excerpts) ? source.excerpts : [])
+      ].join(" ").toLowerCase();
+      const pd = /parkinson|parkinsonism|pd\b/.test(text);
+      const freezing = /freez|frozen|stuck|couldn.?t move|unable to move/.test(text);
+      const transfer = /chair|sit.?to.?stand|stand up|get(ting)? up|transfer|bathroom|walker|walking|gait/.test(text);
+      return pd && freezing && transfer;
+    };
     const journalism = sources.filter(s => s && s.type === "journalism");
 
     const patterns = [];
@@ -50,10 +62,10 @@ export default async function handler(req, res) {
     const addPattern = (title, words, questionList, rabbitHoles, sourceMatcher = null) => {
       const matching = sourceMatcher
         ? sources.filter(s => s && sourceMatcher(s))
-        : sources.filter(s => s && has(s, words));
+        : sources.filter(s => s && (s.type === "community" ? communityRelevantToQuestion(s) && has(s, words) : has(s, words)));
       if (!matching.length) return;
 
-      const exp = matching.filter(s => s.type === "community");
+      const exp = matching.filter(s => s.type === "community" && communityRelevantToQuestion(s));
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
@@ -140,7 +152,7 @@ export default async function handler(req, res) {
         ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
         ["What transfer technique has PT/OT taught for this specific person?", "What should caregivers do when freezing occurs during a chair-to-bathroom transfer?", "Which parts of the transfer are actually unsafe or causing near-misses?"],
         ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"],
-        s => s.type === "community" || ((s.type === "clinical" || s.type === "patient_org") && has(s, ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"]))
+        s => (s.type === "community" ? communityRelevantToQuestion(s) : ((s.type === "clinical" || s.type === "patient_org") && has(s, ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"])))
       );
       addPattern(
         "Using simple cues and slowing the movement",
