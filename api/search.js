@@ -24,9 +24,13 @@ export default async function handler(req,res){
       const raw=await response.text();
       let data;
       try{data=JSON.parse(raw)}catch{
-        throw new Error("Research provider returned non-JSON: "+raw.slice(0,500));
+        console.warn("Research provider returned non-JSON; skipping this search:", raw.slice(0,300));
+        return [];
       }
-      if(!response.ok) throw new Error(data?.error?.message||data?.message||raw.slice(0,500));
+      if(!response.ok){
+        console.warn("Research provider search failed; skipping:", response.status, data?.error?.message||data?.message||raw.slice(0,300));
+        return [];
+      }
       return extractResults(data);
     }
 
@@ -210,9 +214,9 @@ function buildQueries(q){
       "site:reddit.com/r/Parkinsons freezing getting out of chair",
       "site:agingcare.com/questions Parkinson's freeze standing chair caregiver",
       "site:agingcare.com/questions Parkinson's freezing transfer caregiver",
-      "Parkinson's caregiver "stuck in chair"",
-      "Parkinson's caregiver "can't get up" freezing",
-      "Parkinson's caregiver "gets stuck" recliner"
+      "Parkinson's caregiver stuck in chair",
+      "Parkinson's caregiver can't get up freezing",
+      "Parkinson's caregiver gets stuck recliner"
     );
   }
   if(/rehab|physical therapy|pt|nursing|snf|progress/.test(lower)){
