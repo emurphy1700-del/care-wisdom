@@ -27,11 +27,24 @@ export default async function handler(req, res) {
 
     const patterns = [];
 
+    const isCleanEvidenceExcerpt = (excerpt, words) => {
+      const t=String(excerpt||"").replace(/\s+/g," ").trim();
+      if(t.length<80) return false;
+      const lower=t.toLowerCase();
+      const navLinks=(t.match(/\[[^\]]+\]\(https?:/g)||[]).length;
+      const navWords=(lower.match(/caregiver forum|parkinson'?s disease|questions|topics|resources|sign in|create account|home|search/g)||[]).length;
+      if(navLinks>=2 || navWords>=4) return false;
+      if(!words.some(w=>lower.includes(String(w).toLowerCase()))) return false;
+      return /\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|asked|experience|happened|couldn'?t|unable)\b/i.test(t);
+    };
+
+
+
     const addPattern = (title, words, questionList, rabbitHoles) => {
       const matching = sources.filter(s => s && has(s, words));
       if (!matching.length) return;
 
-      const exp = matching.filter(s => s.type === "community" || s.type === "journalism");
+      const exp = matching.filter(s => s.type === "community");
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
@@ -46,7 +59,7 @@ export default async function handler(req, res) {
 
       const excerpts = exp
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
-        .filter(x => words.some(w => String(x).toLowerCase().includes(w)))
+        .filter(x => isCleanEvidenceExcerpt(x, words))
         .slice(0, 2)
         .map(x => String(x).replace(/\s+/g, " ").slice(0, 300));
 
@@ -83,13 +96,13 @@ export default async function handler(req, res) {
           : exp.length
             ? "The reports point in a similar direction, but the available evidence does not establish how generalizable the experience is."
             : "This is clinical context rather than a recurring firsthand pattern.",
-        independence_note: "Experiential evidence spans " + domains.length + " source domains; this is source diversity, not a count of independent people.",
+        independence_note: exp.length ? "This pattern uses " + exp.length + " firsthand source(s) across " + domains.length + " domain(s). Source count is not a count of independent people." : "No firsthand source was strong enough to support this pattern.",
         care_team_questions: [{
           provider: q.includes("freez") ? "Physical Therapist" : "Appropriate care-team clinician",
           questions: questionList
         }],
         evidence_trail: trail,
-        why_this_surfaced: "Multiple supplied sources contained material related to this theme.",
+        why_this_surfaced: exp.length ? "The pattern was surfaced from firsthand/community sources plus any clinical context shown separately." : "The pattern was surfaced from clinical or public context; it is not presented as a recurring firsthand experience.",
         rabbit_holes: rabbitHoles,
         source_titles: trail.map(x => x.title)
       });
