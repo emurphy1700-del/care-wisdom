@@ -37,41 +37,45 @@ export default async function handler(req,res){
     async function discoverRedditViaSearchPages(question){
       const lower=String(question||"").toLowerCase();
       const q=/freez|stuck/.test(lower)
-        ? "freezing transfers chair Parkinson"
+        ? "freezing transfers"
         : String(question||"").slice(0,180);
       const found=new Map();
 
-      // Lightweight Reddit JSON discovery: two bounded requests, one per
-      // relevant subreddit. Discovery is best-effort and never allowed to
-      // break the main research request.
+      // Reddit RSS is used only for discovery. It is public, lightweight, and
+      // gives us individual /comments/ URLs; Parallel then fetches the actual
+      // discussion for evidence extraction.
       for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
-        const u="https://www.reddit.com/r/"+subreddit+"/search.json?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all&limit=15";
+        const u="https://www.reddit.com/r/"+subreddit+"/search.rss?q="+encodeURIComponent(q)+"&restrict_sr=1&sort=relevance&t=all";
         const controller=new AbortController();
         const timer=setTimeout(()=>controller.abort(),5000);
         try{
           const rr=await fetch(u,{
-            headers:{
-              "User-Agent":"CareWisdomResearch/1.0 (public research discovery)"
-            },
+            headers:{"User-Agent":"CareWisdomResearch/1.0 (public research discovery)"},
             signal:controller.signal
           });
           if(!rr.ok) continue;
-          const data=await rr.json();
-          const children=data?.data?.children||[];
-          for(const child of children){
-            const p=child?.data||{};
-            const permalink=String(p.permalink||"");
-            if(!permalink.includes("/comments/")) continue;
-            const url=canonical("https://www.reddit.com"+permalink);
+          const xml=await rr.text();
+
+          const entryRe=/<entry>([\\s\\S]*?)<\\/entry>/gi;
+          let entry;
+          while((entry=entryRe.exec(xml))){
+            const block=entry[1];
+            const linkMatch=block.match(/<link href="(https?:\\/\\/www\\.reddit\\.com\\/r\\/[^"]+\\/comments\\/[^"]+)"/i);
+            if(!linkMatch) continue;
+            const url=canonical(linkMatch[1]);
             if(!url) continue;
+            const titleMatch=block.match(/<title>([\\s\\S]*?)<\\/title>/i);
+            const title=decodeXml(titleMatch?.[1]||"Reddit caregiver discussion");
+            const contentMatch=block.match(/<content[^>]*>([\\s\\S]*?)<\\/content>/i);
+            const rawContent=decodeXml(contentMatch?.[1]||"");
             found.set(url,{
-              title:String(p.title||"Reddit caregiver discussion"),
+              title,
               url,
               domain:"reddit.com",
-              published_date:p.created_utc ? new Date(p.created_utc*1000).toISOString() : null,
-              excerpts:[],
+              published_date:null,
+              excerpts:rawContent ? [stripHtml(rawContent).slice(0,1800)] : [],
               type:"community",
-              discovery_method:"reddit_search_json"
+              discovery_method:"reddit_rss"
             });
           }
         }catch{}finally{
@@ -80,6 +84,7 @@ export default async function handler(req,res){
       }
       return [...found.values()].slice(0,12);
     }
+
 
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
@@ -366,6 +371,15 @@ function normalizeResult(x){
   };
 }
 function canonical(u){try{const x=new URL(u);["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","mc_cid","mc_eid"].forEach(k=>x.searchParams.delete(k));x.hash="";return x.origin+x.pathname.replace(/\/$/,"")}catch{return ""}}
+function decodeXml(s){
+  return String(s||"")
+    .replace(/&quot;/g,'"')
+    .replace(/&apos;/g,"'")
+    .replace(/&amp;/g,"&")
+    .replace(/&lt;/g,"<")
+    .replace(/&gt;/g,">");
+}
+function stripHtml(s){ return String(s||"").replace(/<[^>]+>/g," ").replace(/\\s+/g," ").trim(); }
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
 function isUsefulFirsthand(x){
   const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
