@@ -46,11 +46,13 @@ export default async function handler(req,res){
             const raw=await fr.text(); if(!fr.ok) continue;
             let data; try{data=JSON.parse(raw)}catch{continue}
             for(const page of (data.results||[])){
-              const text=(page.excerpts||[]).join("\n");
-              const re=/\[([^\]]{3,240})\]\((https?:\/\/www\.reddit\.com\/r\/[^)]+\/comments\/[^)]+)\)/g; let m;
+              const text=(page.excerpts||[]).join("\n")+" "+JSON.stringify(page);
+              const re=/https?:\/\/(?:www\.)?reddit\.com\/r\/[^\s"<>\\)]+\/comments\/[^\s"<>\\)]+/gi;
+              let m;
               while((m=re.exec(text))){
-                const url=canonical(m[2]); if(!url||!url.includes("/comments/")) continue;
-                found.set(url,{title:m[1].replace(/\\/g,"").trim(),url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
+                const url=canonical(m[0].replace(/[.,;]+$/,""));
+                if(!url||!url.includes("/comments/")) continue;
+                found.set(url,{title:"Reddit caregiver discussion",url,domain:"reddit.com",published_date:null,excerpts:[],type:"community",discovery_method:"reddit_search_page"});
               }
             }
           }catch{}
