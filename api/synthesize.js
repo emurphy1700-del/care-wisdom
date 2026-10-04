@@ -107,15 +107,41 @@ export default async function handler(req, res) {
 
       const repeated = exp.length >= 2 && domains.length >= 2 && exp.every(communityRelevantToQuestion);
 
+      // Never let a clinical-only finding masquerade as a caregiver/lived-experience
+      // finding. The title and evidence profile must agree with the actual evidence.
+      const displayTitle = !exp.length
+        ? title === "Caregivers describe freezing during transfers"
+          ? "Freezing can occur during transfers"
+          : title === "Using simple cues and slowing the movement"
+            ? "Cueing and slowing are described as possible strategies"
+            : title === "The chair and transfer setup may matter"
+              ? "Transfer setup may affect safety"
+              : title === "Avoiding rushing or pulling"
+                ? "Pacing and communication may matter during transfers"
+                : title
+        : title;
+
+      const evidenceLevel = repeated
+        ? "repeated_independent"
+        : (!exp.length && clin.length ? "strong_clinical_limited_lived" : "limited_support");
+
+      const evidenceLabel = repeated
+        ? "Repeated across source domains"
+        : (!exp.length && clin.length ? "Clinical context; limited lived experience" : "Limited support");
+
+      const evidenceRationale = repeated
+        ? "This appeared in firsthand sources from at least two source domains. That still does not establish independent people or prove the approach works for everyone."
+        : (!exp.length && clin.length
+          ? "Clinical sources address this theme, but no qualifying firsthand report was found in this evidence set. It is presented as clinical context, not as a recurring caregiver experience."
+          : "This appeared in the supplied evidence, but the available sources do not establish independent repeated reports.");
+
       patterns.push({
-        title,
+        title: displayTitle,
         category: exp.length ? (clin.length ? "mixed" : "lived_experience") : "clinical_context",
         evidence_profile: {
-          level: repeated ? "repeated_independent" : "limited_support",
-          label: repeated ? "Repeated across source domains" : "Limited support",
-          rationale: repeated
-            ? "This appeared in firsthand sources from at least two source domains. That still does not establish independent people or prove the approach works for everyone."
-            : "This appeared in the supplied evidence, but the available sources do not establish independent repeated reports."
+          level: evidenceLevel,
+          label: evidenceLabel,
+          rationale: evidenceRationale
         },
         what_people_reported: excerpts.length
           ? excerpts.map(x => "“" + x + "”").join(" ")
@@ -218,9 +244,27 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       question: query,
-      overview: patterns.length
-        ? "The strongest themes surfaced were: " + patterns.slice(0, 3).map(p => p.title).join("; ") + ". Care Wisdom separates firsthand reports from clinical context and preserves uncertainty."
-        : "The evidence pool did not produce a recurring pattern strong enough to promote.",
+      overview: (() => {
+        const recurring = patterns.filter(p => p.evidence_profile?.level === "repeated_independent");
+        const clinicalOnly = patterns.filter(p => p.evidence_profile?.level === "strong_clinical_limited_lived");
+        const limited = patterns.filter(p => p.evidence_profile?.level === "limited_support");
+
+        if (recurring.length) {
+          return "The strongest recurring lived-experience patterns were: " +
+            recurring.slice(0, 3).map(p => p.title).join("; ") +
+            ". Clinical context is shown separately, and source counts are not treated as counts of independent people.";
+        }
+
+        if (clinicalOnly.length) {
+          return "The research surfaced clinical context relevant to this question, but it did not find qualifying repeated firsthand reports strong enough to call these caregiver patterns. Care Wisdom keeps clinical context separate from lived experience and preserves uncertainty.";
+        }
+
+        if (limited.length) {
+          return "The research surfaced potentially relevant reports, but the evidence is too limited to call them recurring independent patterns. Care Wisdom separates firsthand reports from clinical context and preserves uncertainty.";
+        }
+
+        return "The evidence pool did not produce a recurring pattern strong enough to promote.";
+      })(),
       single_reports: singleReports,
       patterns: patterns.slice(0, 4),
       limitations: community.filter(communityRelevantToQuestion).length < 2
