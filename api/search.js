@@ -236,10 +236,14 @@ function canonical(u){try{const x=new URL(u);["utm_source","utm_medium","utm_cam
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
 function isUsefulFirsthand(x){
   const h=(String(x.url||"")+" "+String(x.title||"")+" "+(x.excerpts||[]).join(" ")).toLowerCase();
-  const bad=/(^|\.)support\.zoom\.com|eventbrite|wikipedia\.org|dictionary|glossary|directory|webinar|workshop|landing|\/topics?\/|\/caregiving-information|\/carepartner|\/resources-support\/carepartners\/pointers|\/caregiver-forum$|\/caregiver-forum\/discussions\?/.test(h);
+  const bad=/(^|\.)support\.zoom\.com|eventbrite|wikipedia\.org|dictionary|glossary|directory|webinar|workshop|landing|\/topics?\/|\/caregiving-information|\/carepartner|\/resources-support\/carepartners\/pointers|\/caregiver-forum/.test(h);
   if(bad)return false;
-  if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\//.test(String(x.url||""));
-  if(x.domain==="agingcare.com") return /\/questions\/[^/]+\.htm/.test(String(x.url||""));
+  if(x.domain==="reddit.com") return /\/r\/[^/]+\/comments\/[^/?#]+/.test(String(x.url||""));
+  if(x.domain==="agingcare.com") {
+    const u=String(x.url||"").toLowerCase();
+    return /\/questions\/[^/?#]+-\d+\.htm(?:[?#].*)?$/.test(u)
+      && !/\/topics\/|\/caregiver-forum/.test(u);
+  }
   // Generic sites must contain evidence of an actual person's experience,
   // not merely the word "caregiver" in an article title.
   return /(forum|question|discussion|my (mom|dad|mother|father|husband|wife|partner)|we found|i found|in my experience|our experience|what helped us|what worked for us|we tried|i tried)/.test(h);
