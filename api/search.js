@@ -32,15 +32,12 @@ export default async function handler(req,res){
 
     // Run distinct evidence searches. This is intentional: a single broad search
     // tends to over-return clinical/SEO pages and under-return firsthand discussions.
+    // Use the targeted discovery queries built above for the lived-experience
+    // search. The previous version accidentally built them but then ignored them.
     const communityQueries=[
-      "site:reddit.com/r/Parkinsons/comments/ "+q+" caregiver",
-      "site:reddit.com/r/ParkinsonsCaregivers/comments/ "+q+" caregiver",
-      "site:agingcare.com/questions "+q+" caregiver experience",
-      q+" caregiver experience what helped forum",
-      q+" patient caregiver discussion what helped",
-      q+" freezing standing from chair caregiver",
-      "site:myparkinsons.org "+q+" forum",
-      "site:parkinson.org caregiver freezing chair transfer"
+      ...buildQueries(q).filter(x =>
+        /reddit\.com|agingcare\.com|caregiver|carepartner|forum|freez|stuck|chair|recliner|sit to stand|transfer|getting up|what helped|what worked/i.test(x)
+      ).slice(0,8)
     ];
     const clinicalQueries=[
       q+" clinical evidence rehabilitation",
