@@ -259,11 +259,32 @@ function guessType(url,title){
 
 
 function isQuestionRelevant(source, question, minHits=1){
-  const stop=new Set(["what","have","has","had","when","where","why","how","does","did","can","could","would","should","someone","people","person","caregiver","caregivers","patient","patients","with","from","that","this","they","their","getting","helpful","found","tried","help","parkinsons","parkinson","disease"]);
-  const qTokens=String(question||"").toLowerCase().replace(/[^a-z0-9\\s-]/g," ").split(/\\s+/).filter(w=>w.length>=4&&!stop.has(w));
+  const q=String(question||"").toLowerCase();
   const text=[source.title||"",source.url||"",...(source.excerpts||[])].join(" ").toLowerCase();
-  const unique=[...new Set(qTokens)];
-  return unique.filter(w=>text.includes(w)).length>=minHits;
+  const combined=q+" "+text;
+
+  // Match concepts, not exact words. People describe the same event differently
+  // ("gets stuck rising from the recliner" vs. "freezes getting out of a chair").
+  const groups=[
+    ["freezing","freeze","freezes","frozen","stuck","gets stuck","can't move","cannot move","feet won't move"],
+    ["chair","recliner","seat","sitting","sit to stand","stand up","rising","getting up","rise from"],
+    ["transfer","mobility","walking","gait","movement","move","steps","standing"],
+    ["cue","cueing","count","countdown","music","rhythm","visual","verbal","march","rock"],
+    ["caregiver","carepartner","care partner","husband","wife","mother","father","mom","dad","patient"]
+  ];
+
+  const questionGroups=groups.filter(g=>g.some(term=>q.includes(term)));
+  if(!questionGroups.length) return true;
+
+  let hits=0;
+  for(const g of questionGroups){
+    if(g.some(term=>combined.includes(term))) hits++;
+  }
+
+  // For clinical/public context, one strong problem-specific concept plus
+  // a relevant disease/context term is enough. For firsthand sources,
+  // require two matching concepts so generic caregiving pages stay out.
+  return hits >= minHits;
 }
 
 function diversifyByDomain(items,max){
