@@ -139,7 +139,7 @@ export default async function handler(req,res){
       recoveryResults=recoverySettled[0].status==="fulfilled"?recoverySettled[0].value:[];
     }
     const searchFailures=settled.filter(x=>x.status==="rejected").length;
-        const results=[...redditResults,...recoveryResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
+        const results=[...redditDiscoveryResults,...redditResults,...recoveryResults,...aarpResults,...communityResults,...generalResults,...clinicalResults].map(normalizeResult).filter(x=>x.url);
     const deduped=[]; const seen=new Set();
     for(const x of results){
       const key=canonical(x.url);
@@ -198,7 +198,7 @@ export default async function handler(req,res){
     for(const s of selected){
       const e=extractedByUrl.get(canonical(s.url));
       if(e){
-        s.excerpts=(e.excerpts||s.excerpts||[]).slice(0,4).map(String);
+        s.excerpts=(e.excerpts&&e.excerpts.length?e.excerpts:s.excerpts||[]).slice(0,4).map(cleanEvidenceText).filter(x=>x.length>=40);
         s.extracted=true;
       }
     }
