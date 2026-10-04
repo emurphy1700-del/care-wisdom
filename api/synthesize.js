@@ -105,7 +105,7 @@ export default async function handler(req, res) {
         .filter(Boolean)
         .slice(0, 2);
 
-      const repeated = exp.length >= 2 && domains.length >= 2;
+      const repeated = exp.length >= 2 && domains.length >= 2 && exp.every(communityRelevantToQuestion);
 
       patterns.push({
         title,
@@ -223,8 +223,8 @@ export default async function handler(req, res) {
         : "The evidence pool did not produce a recurring pattern strong enough to promote.",
       single_reports: singleReports,
       patterns: patterns.slice(0, 4),
-      limitations: community.length < 2
-        ? ["Few qualifying firsthand discussion records were found. Source-domain diversity is not the same as independent people."]
+      limitations: community.filter(communityRelevantToQuestion).length < 2
+        ? ["Few directly relevant firsthand discussion records were found. Source-domain diversity is not the same as independent people."]
         : [],
       safety_flags: safety,
       sources,
