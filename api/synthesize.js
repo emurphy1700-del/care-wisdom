@@ -72,6 +72,17 @@ export default async function handler(req, res) {
       return (hits.length ? hits.slice(0,2).join(" ") : t).slice(0,420);
     };
 
+    // Forum extractors often prepend answer counts, usernames, avatar labels,
+    // and dates to the first sentence. Strip that page furniture before an
+    // excerpt is shown to the user; keep the person's actual words intact.
+    const cleanForumExcerpt = (excerpt) => {
+      let t = String(excerpt || "").replace(/\s+/g, " ").trim();
+      t = t.replace(/^\s*\d+\s+answers?\b.*?\b(?:19|20)\d{2}\b[^.!?]*[,:]\s*/i, "");
+      t = t.replace(/^\s*(?:avatar|profile|username)\b.*?\b(?:19|20)\d{2}\b[^.!?]*[,:]\s*/i, "");
+      t = t.replace(/^\s*(?:asked|posted|answered)\s+by\b.*?[,:]\s*/i, "");
+      return t.trim();
+    };
+
     const addPattern = (title, words, questionList, rabbitHoles, sourceMatcher = null, clinicalWords = null) => {
       const matching = sourceMatcher
         ? sources.filter(s => s && sourceMatcher(s))
@@ -266,12 +277,15 @@ export default async function handler(req, res) {
       .map(s => {
         const rawExcerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
         const relevantExcerpt = rawExcerpts
+          .map(e => cleanForumExcerpt(e))
           .filter(e => isCleanEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
           .map(e => focusEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
+          .map(e => cleanForumExcerpt(e))
           .find(Boolean)
           || rawExcerpts
-            .filter(e => String(e || "").trim().length >= 80)
-            .map(e => String(e).replace(/\s+/g, " ").trim().slice(0, 420))
+            .map(e => cleanForumExcerpt(e))
+            .filter(e => e.length >= 80)
+            .map(e => e.slice(0, 420))
             .find(Boolean)
           || "";
 
