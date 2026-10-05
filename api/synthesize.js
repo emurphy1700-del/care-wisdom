@@ -303,17 +303,27 @@ export default async function handler(req, res) {
           const relevant = sentences.filter(sentence => {
             const lower = sentence.toLowerCase();
             const topicHit = queryWords.some(w => lower.includes(w));
-            const caregivingHit = /\b(i|we|my|our|husband|wife|mother|father|mom|dad|resident|patient|caregiver|ot|occupational therapist)\b/i.test(sentence);
+            const caregivingHit = /\b(i|we|my|our|husband|wife|mother|father|mom|dad|resident|patient|caregiver|ot|occupational therapist|parkinson|hoyer|hoist|lift|toilet|bathroom|shower)\b/i.test(sentence);
             return topicHit && caregivingHit;
           });
 
-          const chosen = (relevant.length ? relevant : sentences)
+          // If the question terms are not repeated in the extracted passage,
+          // fall back to the source's caregiving-specific sentences rather
+          // than silently rendering an empty report.
+          const caregivingSentences = sentences.filter(sentence =>
+            /\b(i|we|my|our|husband|wife|mother|father|mom|dad|resident|patient|caregiver|ot|occupational therapist|parkinson|hoyer|hoist|lift|toilet|bathroom|shower)\b/i.test(sentence)
+          );
+
+          const chosen = (relevant.length ? relevant : caregivingSentences.length ? caregivingSentences : sentences)
             .slice(0, 3)
             .join(" ")
             .trim();
 
-          if (chosen.length <= 420) return chosen;
-          const short = chosen.slice(0, 420);
+          // Prefer complete sentences. These are source excerpts, so it is
+          // better to show a slightly longer complete passage than to end
+          // mid-sentence. Only trim when the passage is unusually long.
+          if (chosen.length <= 700) return chosen;
+          const short = chosen.slice(0, 700);
           const lastSentenceEnd = Math.max(short.lastIndexOf("."), short.lastIndexOf("?"), short.lastIndexOf("!"));
           return lastSentenceEnd >= 100 ? short.slice(0, lastSentenceEnd + 1) : short.replace(/\s+\S*$/, "") + "…";
         };
