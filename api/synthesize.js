@@ -48,6 +48,11 @@ export default async function handler(req, res) {
       }
 
       if (!groups.length) return true;
+
+      // For a highly specific caregiving question, require evidence from at
+      // least two substantive concepts when the source is a community report.
+      // This prevents generic Parkinson's/caregiver pages from appearing as
+      // "single reports" merely because they mention the disease.
       return groups.filter(re => re.test(text)).length >= Math.min(2, groups.length);
     };
 
