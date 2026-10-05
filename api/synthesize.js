@@ -287,78 +287,18 @@ export default async function handler(req, res) {
     // enough to support a synthesized pattern. Do not compare the excerpt
     // against every word in the full question: ordinary caregiver language
     // often omits disease names and uses different phrasing.
-    // A "single report" is an auditable evidence item, not merely a community-domain
-    // result. It must have a real individual discussion URL, a meaningful title (or
-    // enough URL context to generate a neutral label), and an extracted firsthand
-    // passage. This prevents generic Reddit/site descriptions such as "The heart of
-    // the internet" from being presented as evidence.
-    const singleReportRelevanceWords =
-      /rehab|rehabilitation|physical therapy|\\bpt\\b|occupational therapy|\\bot\\b|progress|plateau|stalled/i.test(q)
-        ? ["rehab","rehabilitation","physical therapy","therapy","progress","patient","caregiver"]
-        : /freez|stuck|chair|recliner|sit[- ]?to[- ]stand|getting out|get(ting)? up|transfer/i.test(q)
-          ? ["freez","frozen","stuck","chair","recliner","stand","getting up","transfer","walking","caregiver"]
-          : /blood pressure|orthostatic|hypotension|faint|near[- ]?faint|dizz|lightheaded|syncope/i.test(q)
-            ? ["blood pressure","orthostatic","hypotension","faint","dizzy","lightheaded","syncope","caregiver","patient"]
-            : /toilet|toileting|bathroom|commode/i.test(q)
-              ? ["toilet","toileting","bathroom","commode","caregiver","patient"]
-              : ["caregiver","patient","experience","tried","helped","worked"];
-
-    const genericReportTitles = new Set([
-      "the heart of the internet","reddit","reddit.com","home","search",
-      "caregiver forum","forum","discussion","untitled"
-    ]);
-
     const singleReports = sources
       .filter(s => {
-        if (!s || s.type !== "community" || used.has(s.url)) return false;
-
-        const url = String(s.url || "");
-        const title = String(s.title || "").replace(/\\s+/g, " ").trim();
-        const excerpts = Array.isArray(s.excerpts)
-          ? s.excerpts.map(x => String(x || "").replace(/\\s+/g, " ").trim()).filter(Boolean)
-          : [];
-
-        if (!/^https?:\\/\\//i.test(url) || !title || !excerpts.length) return false;
-        if (genericReportTitles.has(title.toLowerCase())) return false;
-
-        if (s.domain === "reddit.com" &&
-            !/\\/r\\/[^/]+\\/comments\\/[^/?#]+/i.test(url)) return false;
-
-        if (s.domain === "agingcare.com" &&
-            !/\\/questions\\/(?:[^/?#]+-)?\\d+(?:\\.htm)?(?:[?#].*)?$/i.test(url.toLowerCase())) return false;
-
-        // Require an actual first-person/caregiver signal in the extracted passage.
-        const firsthand = excerpts.some(e =>
-          /\\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|asked|experience|happened|couldn'?t|unable)\\b/i.test(e)
+        if(!s || s.type !== "community" || used.has(s.url)) return false;
+        if(communityRelevantToQuestion(s)) return true;
+        const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
+        const relevanceWords = /rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|improv|stalled|goal|freez|frozen|stuck|chair|recliner|transfer|stand|get(ting)? up|blood pressure|orthostatic|hypotension|faint|dizz|lightheaded|toilet|toileting|bathroom|commode/;
+        return excerpts.some(e =>
+          isCleanEvidenceExcerpt(e, String(e).match(relevanceWords) ? [String(e).match(relevanceWords)[0]] : [])
         );
-        if (!firsthand) return false;
-
-        // Require both a clean passage and substantive overlap with the question.
-        const clean = excerpts.find(e => isCleanEvidenceExcerpt(e, singleReportRelevanceWords));
-        if (!clean) return false;
-
-        return communityRelevantToQuestion(s);
       })
       .slice(0, 5)
-      .map(s => {
-        const excerpt = (s.excerpts || []).find(e =>
-          isCleanEvidenceExcerpt(e, singleReportRelevanceWords)
-        ) || s.excerpts?.[0] || "";
-
-        let title = String(s.title || "").replace(/\\s+/g, " ").trim();
-        if (genericReportTitles.has(title.toLowerCase())) {
-          const match = String(s.url || "").match(/\\/r\\/([^/]+)\\/comments\\//i);
-          title = match ? "Reddit discussion in r/" + match[1] : "Community discussion";
-        }
-
-        return {
-          title,
-          url: String(s.url),
-          domain: String(s.domain || "community source"),
-          reason: "Individual firsthand report; not enough independent evidence to call it a recurring pattern.",
-          excerpt: focusEvidenceExcerpt(excerpt, singleReportRelevanceWords).slice(0, 420)
-        };
-      });
+      .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
 
     const domains = [...new Set(sources.map(s => s && s.domain).filter(Boolean))];
 
