@@ -77,6 +77,16 @@ export default async function handler(req, res) {
     // excerpt is shown to the user; keep the person's actual words intact.
     const cleanForumExcerpt = (excerpt) => {
       let t = String(excerpt || "").replace(/\s+/g, " ").trim();
+
+      // Forum scrapers may put page furniture in the middle of an otherwise
+      // useful excerpt. Once we hit an answer-count/avatar/date marker, stop
+      // before that metadata rather than exposing usernames or timestamps.
+      t = t.replace(/\s+\.\.\.\s*\d+\s+Answers?\b.*$/i, "");
+      t = t.replace(/\s+\d+\s+Answers?\b.*$/i, "");
+      t = t.replace(/\s+\b(?:avatar|profile)\s+[A-Za-z0-9_@-]+\b.*$/i, "");
+
+      // Also remove common leading page furniture when it appears before the
+      // actual firsthand text.
       t = t.replace(/^\s*\d+\s+answers?\b.*?\b(?:19|20)\d{2}\b[^.!?]*[,:]\s*/i, "");
       t = t.replace(/^\s*(?:avatar|profile|username)\b.*?\b(?:19|20)\d{2}\b[^.!?]*[,:]\s*/i, "");
       t = t.replace(/^\s*(?:asked|posted|answered)\s+by\b.*?[,:]\s*/i, "");
