@@ -286,18 +286,41 @@ export default async function handler(req, res) {
       .slice(0, 5)
       .map(s => {
         const rawExcerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
+        const queryWords = q.split(/\s+/)
+          .map(w => w.replace(/[^a-z0-9'-]/g, ""))
+          .filter(w => w.length >= 4)
+          .slice(0, 16);
+
+        const extractSingleReportExcerpt = (raw) => {
+          const cleaned = cleanForumExcerpt(raw);
+          if (cleaned.length < 60) return "";
+
+          const sentences = cleaned
+            .split(/(?<=[.!?])\s+/)
+            .map(s => s.trim())
+            .filter(Boolean);
+
+          const relevant = sentences.filter(sentence => {
+            const lower = sentence.toLowerCase();
+            const topicHit = queryWords.some(w => lower.includes(w));
+            const caregivingHit = /\b(i|we|my|our|husband|wife|mother|father|mom|dad|resident|patient|caregiver|ot|occupational therapist)\b/i.test(sentence);
+            return topicHit && caregivingHit;
+          });
+
+          const chosen = (relevant.length ? relevant : sentences)
+            .slice(0, 3)
+            .join(" ")
+            .trim();
+
+          if (chosen.length <= 420) return chosen;
+          const short = chosen.slice(0, 420);
+          const lastSentenceEnd = Math.max(short.lastIndexOf("."), short.lastIndexOf("?"), short.lastIndexOf("!"));
+          return lastSentenceEnd >= 100 ? short.slice(0, lastSentenceEnd + 1) : short.replace(/\s+\S*$/, "") + "…";
+        };
+
         const relevantExcerpt = rawExcerpts
-          .map(e => cleanForumExcerpt(e))
-          .filter(e => isCleanEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
-          .map(e => focusEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
-          .map(e => cleanForumExcerpt(e))
-          .find(Boolean)
-          || rawExcerpts
-            .map(e => cleanForumExcerpt(e))
-            .filter(e => e.length >= 80)
-            .map(e => e.slice(0, 420))
-            .find(Boolean)
-          || "";
+          .map(extractSingleReportExcerpt)
+          .find(Boolean) || "";
 
         return {
           title: String(s.title || "Untitled report").trim().slice(0, 180),
