@@ -31,8 +31,6 @@ export default async function handler(req, res) {
         ...(Array.isArray(source.excerpts) ? source.excerpts : [])
       ].join(" ").toLowerCase();
 
-      // Match firsthand reports to the actual question rather than using a
-      // hard-coded freezing/transfer gate for every Parkinson's query.
       const groups = [];
       if (/freez|stuck|chair|recliner|sit[- ]?to[- ]stand|getting out|get(ting)? up|transfer/.test(q)) {
         groups.push(/freez|frozen|stuck|couldn.?t move|unable to move/);
@@ -50,13 +48,10 @@ export default async function handler(req, res) {
       }
 
       if (!groups.length) return true;
-      // A firsthand record should address at least two substantive aspects of
-      // the actual question. We intentionally do not require it to repeat
-      // "Parkinson's" because people often rely on conversation context.
       return groups.filter(re => re.test(text)).length >= Math.min(2, groups.length);
     };
-    const journalism = sources.filter(s => s && s.type === "journalism");
 
+    const journalism = sources.filter(s => s && s.type === "journalism");
     const patterns = [];
 
     const isCleanEvidenceExcerpt = (excerpt, words) => {
@@ -69,8 +64,6 @@ export default async function handler(req, res) {
       if(!words.some(w=>lower.includes(String(w).toLowerCase()))) return false;
       return /\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|asked|experience|happened|couldn'?t|unable)\b/i.test(t);
     };
-
-
 
     const focusEvidenceExcerpt = (excerpt, words) => {
       const t=String(excerpt||"").replace(/\s+/g," ").trim();
@@ -106,9 +99,6 @@ export default async function handler(req, res) {
         .filter(Boolean)
         .slice(0, 2);
 
-      // If extraction is too thin, preserve the firsthand source signal rather
-      // than telling the user that no report exists. We deliberately describe
-      // this as a report/discussion, not as proof that an intervention worked.
       const fallbackReports = exp
         .filter(s => !excerpts.length || !Array.isArray(s.excerpts) || !s.excerpts.length)
         .slice(0, 3)
@@ -124,19 +114,12 @@ export default async function handler(req, res) {
         })) : [])
         .flatMap(({sourceTitle, excerpt}) => {
           const titleLower = sourceTitle.toLowerCase();
-          // Extract sentences from the body, then discard sentences that are
-          // effectively the article title, author/affiliation metadata, or
-          // navigation/abstract labels. Care Wisdom should quote evidence, not
-          // simply repeat the title of the paper.
           return excerpt.split(/(?<=[.!?])\s+/)
             .map(s => s.trim())
             .filter(s => s.length >= 55)
             .filter(s => s.toLowerCase() !== titleLower)
             .filter(s => !/^(abstract|introduction|background|methods|results|conclusion|quick summary|affiliations?)\b/i.test(s))
             .filter(s => !/quick summary|management includes|sign in|create account|home|topics|resources|search|table of contents/i.test(s))
-            // Do not treat image captions, alt text, or figure descriptions as
-            // clinical evidence. These often describe a person in a photo rather
-            // than report a finding from the study.
             .filter(s => !/^(man|woman|person|patient|patient[s']?)\s+(standing|sitting|walking|using|holding|shown|pictured)|using (a )?(crane|walker|cane|wheelchair) and holding|pictured|shown in (the )?(image|photo|figure)/i.test(s))
             .map(s => ({sourceTitle, sentence:s}));
         })
@@ -144,8 +127,6 @@ export default async function handler(req, res) {
           const lower = sentence.toLowerCase();
           const evidenceWords = Array.isArray(clinicalWords) && clinicalWords.length ? clinicalWords : words;
           const hits = evidenceWords.filter(w => lower.includes(String(w).toLowerCase())).length;
-          // Require substantive clinical relevance to THIS pattern, not merely
-          // a shared disease word or a generic therapy/freezing mention.
           const substantive = /(freez|transfer|sit.?to.?stand|standing|gait|fall|cue|rehab|physical therapy|occupational therapy|mobility|functional|outcome|goal|measure|progress|participat|orthostatic|blood pressure|hypotension|dizz|lightheaded|fatigue|medication|symptom|pain|weakness)/i.test(lower);
           return hits >= Math.min(2, Math.max(1, words.length)) && substantive;
         })
@@ -155,8 +136,6 @@ export default async function handler(req, res) {
 
       const repeated = exp.length >= 2 && domains.length >= 2 && exp.every(communityRelevantToQuestion);
 
-      // Never let a clinical-only finding masquerade as a caregiver/lived-experience
-      // finding. The title and evidence profile must agree with the actual evidence.
       const displayTitle = !exp.length
         ? title === "Caregivers describe freezing during transfers"
           ? "Freezing can occur during transfers"
@@ -220,10 +199,7 @@ export default async function handler(req, res) {
       });
     };
 
-    // Rehabilitation/PT questions need their own synthesis path. Do not
-    // force them through the freezing library just because "standing" or
-    // "getting up" appears in a rehab description.
-    if (/(rehab|rehabilitation|physical therapy|\\bpt\\b|occupational therapy|\\bot\\b|not making progress|plateau|stalled|skilled nursing|snf)/i.test(q)) {
+    if (/(rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|not making progress|plateau|stalled|skilled nursing|snf)/i.test(q)) {
       addPattern(
         "Progress in rehabilitation needs to be judged by specific functional goals",
         ["progress","goal","improv","rehab","therapy","physical"],
@@ -242,11 +218,6 @@ export default async function handler(req, res) {
       );
     }
 
-    // Only use the freezing/transfer pattern library when the question
-    // explicitly asks about that problem. Generic words such as "standing"
-    // or "getting up" can appear in many unrelated clinical questions
-    // (orthostatic symptoms, falls, weakness, PT, etc.) and must not trigger
-    // freezing-specific synthesis.
     if (/(freez|stuck|transfer|chair|recliner|sit[- ]?to[- ]stand|getting out of (a |the )?(chair|bed)|cueing|cue|gait freezing)/i.test(q)) {
       addPattern(
         "Caregivers describe freezing during transfers",
@@ -276,17 +247,11 @@ export default async function handler(req, res) {
     }
 
     const used = new Set(patterns.flatMap(p => p.evidence_trail.map(x => x.url)));
-    const qTerms = [...new Set(q
-      .replace(/[^a-z0-9\\s-]/g," ")
-      .split(/\\s+/)
-      .filter(w => w.length >= 5)
-      .filter(w => !["what","have","found","helpful","someone","caregiver","caregivers","parkinsons","disease"].includes(w))
-    )];
 
-    // Preserve relevant firsthand records even when they are not strong
-    // enough to support a synthesized pattern. Do not compare the excerpt
-    // against every word in the full question: ordinary caregiver language
-    // often omits disease names and uses different phrasing.
+    // Keep relevant firsthand records visible even when they are not strong or
+    // repeated enough to support a synthesized pattern. These must remain
+    // structured source objects so the UI can render the real title, domain,
+    // excerpt, and working link instead of a generic placeholder string.
     const singleReports = sources
       .filter(s => {
         if(!s || s.type !== "community" || used.has(s.url)) return false;
@@ -298,7 +263,27 @@ export default async function handler(req, res) {
         );
       })
       .slice(0, 5)
-      .map(s => String(s.title || "Untitled") + " (" + String(s.domain || "") + ") — individual report worth exploring.");
+      .map(s => {
+        const rawExcerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
+        const relevantExcerpt = rawExcerpts
+          .filter(e => isCleanEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
+          .map(e => focusEvidenceExcerpt(e, q.split(/\s+/).filter(w => w.length >= 4).slice(0, 12)))
+          .find(Boolean)
+          || rawExcerpts
+            .filter(e => String(e || "").trim().length >= 80)
+            .map(e => String(e).replace(/\s+/g, " ").trim().slice(0, 420))
+            .find(Boolean)
+          || "";
+
+        return {
+          title: String(s.title || "Untitled report").trim().slice(0, 180),
+          url: String(s.url || ""),
+          domain: String(s.domain || "community source").trim(),
+          type: String(s.type || "community"),
+          excerpt: relevantExcerpt,
+          reason: "Relevant firsthand/community discussion surfaced for this question; it was not strong or repeated enough to establish a recurring pattern."
+        };
+      });
 
     const domains = [...new Set(sources.map(s => s && s.domain).filter(Boolean))];
 
