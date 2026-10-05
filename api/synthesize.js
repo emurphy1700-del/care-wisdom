@@ -319,6 +319,15 @@ export default async function handler(req, res) {
       "untitled"
     ]);
 
+    const isUsefulFirsthand = (s) => {
+      if (!s || s.type !== "community") return false;
+      const url=String(s.url||"").toLowerCase();
+      if (s.domain==="reddit.com" && !/\/r\/[^/]+\/comments\/[^/?#]+/i.test(url)) return false;
+      if (s.domain==="agingcare.com" && !/\/questions\/(?:[^/?#]+-)?\d+(?:\.htm)?(?:[?#].*)?$/i.test(url)) return false;
+      const text=[s.title||"",...(Array.isArray(s.excerpts)?s.excerpts:[])].join(" ");
+      return /\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|asked|experience|happened|couldn'?t|unable)\b/i.test(text);
+    };
+
     const isAuditableSingleReport = (s) => {
       if (!s || s.type !== "community" || used.has(s.url)) return false;
       const url=String(s.url||"");
