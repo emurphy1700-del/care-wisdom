@@ -158,8 +158,8 @@ export default async function handler(req, res) {
       const guide = matching.filter(s => {
         const h=(String(s.url||"")+" "+String(s.title||"")).toLowerCase();
         return s.type === "caregiver_guidance" ||
-          /agingcare\.com\/articles\///.test(h) ||
-          /aarp\\.org/.test(h) ||
+          h.includes("agingcare.com/articles/") ||
+          h.includes("aarp.org") ||
           h.includes("parkinson.org/resources-support/carepartners");
       });
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
