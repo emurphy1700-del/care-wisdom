@@ -33,9 +33,9 @@ export default async function handler(req, res) {
       if (!s) return false;
       const h = (String(s.url || "") + " " + String(s.title || "")).toLowerCase();
       return s.type === "caregiver_guidance" ||
-        /agingcare\.com\/articles\///.test(h) ||
-        /aarp\\.org/.test(h) ||
-        /parkinson\.org\/resources-support\/carepartners/.test(h);
+        h.includes("agingcare.com/articles/") ||
+        h.includes("aarp.org") ||
+        h.includes("parkinson.org/resources-support/carepartners");
     });
 
     // Strategy questions need a different evidence standard from questions that
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
         return s.type === "caregiver_guidance" ||
           /agingcare\.com\/articles\///.test(h) ||
           /aarp\\.org/.test(h) ||
-          /parkinson\.org\/resources-support\/carepartners/.test(h);
+          h.includes("parkinson.org/resources-support/carepartners");
       });
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
