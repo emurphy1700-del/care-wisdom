@@ -483,7 +483,59 @@ function isQuestionRelevant(source, question, minHits=2){
   // specific question, the source must address at least one substantive aspect
   // of the actual problem. If the question has several substantive aspects,
   // require at least two when possible.
-  if(substantive.length) return substantiveHits >= Math.min(minHits, substantive.length);
+  if(substantive.length) {
+    // Some questions contain a defining symptom/problem plus a setting. Do not
+    // let a source pass merely because it matches two generic context terms.
+    // For example, a Parkinson's activities thread may mention a wheelchair
+    // and transfers but still say nothing about freezing.
+    const freezeGroup = groups[0];
+    const hoyerGroup = groups[4];
+    const cueGroup = groups[5];
+    const rehabGroup = groups[6];
+    const bpGroup = groups[7];
+    const fallGroup = groups[8];
+
+    const hasGroup = (group) => group.some(term => text.includes(term));
+    const qHas = (group) => active.includes(group);
+
+    if(qHas(freezeGroup)) {
+      if(!hasGroup(freezeGroup)) return false;
+      const otherHits = substantive.filter(g => g !== freezeGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    if(qHas(hoyerGroup)) {
+      if(!hasGroup(hoyerGroup)) return false;
+      const otherHits = substantive.filter(g => g !== hoyerGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    if(qHas(bpGroup)) {
+      if(!hasGroup(bpGroup)) return false;
+      const otherHits = substantive.filter(g => g !== bpGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    if(qHas(fallGroup)) {
+      if(!hasGroup(fallGroup)) return false;
+      const otherHits = substantive.filter(g => g !== fallGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    if(qHas(cueGroup)) {
+      if(!hasGroup(cueGroup)) return false;
+      const otherHits = substantive.filter(g => g !== cueGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    if(qHas(rehabGroup)) {
+      if(!hasGroup(rehabGroup)) return false;
+      const otherHits = substantive.filter(g => g !== rehabGroup && hasGroup(g)).length;
+      return otherHits >= 1;
+    }
+
+    return substantiveHits >= Math.min(minHits, substantive.length);
+  }
   return active.filter(g=>g.some(term=>text.includes(term))).length >= minHits;
 }
 
