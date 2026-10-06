@@ -213,7 +213,8 @@ export default async function handler(req,res){
       ...reddit,
       ...communityForums,
       ...clinical,
-      ...journalism
+      ...journalism,
+      ...deduped.filter(x=>x.type==="caregiver_guidance")
     ],18);
 
     // Second stage: retrieve focused passages from the actual pages.
@@ -263,7 +264,7 @@ export default async function handler(req,res){
       // "sit-to-stand").
       if(s.type==="community") ok=isQuestionRelevant(s,q,2);
       else if(s.type==="clinical" || s.type==="patient_org") ok=isQuestionRelevant(s,q,1);
-      else if(s.type==="journalism") ok=isQuestionRelevant(s,q,1);
+      else if(s.type==="journalism" || s.type==="caregiver_guidance") ok=isQuestionRelevant(s,q,1);
       if(!ok) relevanceRejections.push({domain:s.domain,title:String(s.title||"").slice(0,180),url:s.url,type:s.type});
       return ok;
     });
@@ -308,6 +309,7 @@ export default async function handler(req,res){
         },
         aarp_sources:relevantSelected.filter(x=>x.domain==="aarp.org").length,
         public_sources:relevantSelected.filter(x=>x.type==="journalism").length,
+        caregiver_guidance_sources:relevantSelected.filter(x=>x.type==="caregiver_guidance").length,
         domains,
         search_failures:searchFailures
       },
@@ -467,6 +469,7 @@ function isUsefulPublicReporting(x){
 }
 function guessType(url,title){
   const h=(url+" "+title).toLowerCase();
+  if(/agingcare\.com\/articles\//.test(h))return "caregiver_guidance";
   if(/agingcare\.com|reddit\.com|parkinson(s)?snewstoday\.com\/forums|myparkinsons\.org|parkinsonssupport|parkinsonsforum|patient.?forum|caregiver.?forum/.test(h))return "community";
   if(/parkinson\.org|lbda|movementdisorders\.org/.test(h))return "patient_org";
   if(/pubmed|nih\.gov|ncbi\.nlm|mayoclinic|hopkinsmedicine|stanford\.edu|neuropt\.org|apta\.org|\.edu\//.test(h))return "clinical";
