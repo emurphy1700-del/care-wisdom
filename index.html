@@ -46,7 +46,9 @@ function render(d){
      (/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(x)?4:0)+
      (/(help|use|try|focus|move|walk|practice|strategy|tip|technique)/i.test(x)?2:0)+
      (/(safe|safety|independence)/i.test(x)?1:0)}))
-     .filter(v=>v.score>=4).sort((a,b)=>b.score-a.score)[0];
+     .filter(v=>v.score>=5)
+     .filter(v=>/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(v.x))
+     .sort((a,b)=>b.score-a.score)[0];
    return relevant?{s,excerpt:relevant.x}:null;
  }).filter(Boolean).slice(0,4);
  if(guidanceSources.length)html+=`<div class="evidence-note"><b>Caregiver guidance found</b><div>These sources offer caregiver-oriented strategies or guidance. They are presented separately from firsthand reports and are not evidence that an approach works for everyone.</div><div class="sources">${guidanceSources.map(({s,excerpt})=>`<div class="source"><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title||s.url)}</a><div class="small muted">${esc(s.domain||'caregiver guidance')}</div><div style="margin-top:5px">${esc(excerpt.slice(0,420))}</div></div>`).join('')}</div></div>`;
