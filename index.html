@@ -36,8 +36,8 @@ function render(d){
  const guidanceSources=(d.sources||[]).map(s=>{
    const h=((s.url||'')+' '+(s.title||'')).toLowerCase();
    const isGuidance=s.type==='caregiver_guidance'||h.includes('agingcare.com/articles/')||h.includes('aarp.org')||h.includes('parkinson.org/resources-support/carepartners');
-   if(!isGuidance)return null;
-   const raw=(Array.isArray(s.excerpts)?s.excerpts:[]).join(' ').replace(/\\s+/g,' ');
+   if(!isGuidance || /^video\s*:/i.test(String(s.title||'')))return null;
+   const raw=(Array.isArray(s.excerpts)?s.excerpts:[]).join(' ').replace(/\s+/g,' ');
    const sentences=raw.split(/(?<=[.!?])\\s+/).map(x=>x.trim())
      .filter(x=>x.length>=45)
      .filter(x=>!/(quick summary|sign in|create account|table of contents|home|topics|resources|search)/i.test(x))
