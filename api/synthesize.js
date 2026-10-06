@@ -66,8 +66,14 @@ export default async function handler(req, res) {
       const navLinks=(t.match(/\[[^\]]+\]\(https?:/g)||[]).length;
       const navWords=(lower.match(/caregiver forum|parkinson'?s disease|questions|topics|resources|sign in|create account|home|search/g)||[]).length;
       if(navLinks>=2 || navWords>=4) return false;
+      // Reject page-navigation boilerplate and bare question prompts. A search
+      // result or forum title asking for advice is not evidence of what someone
+      // actually experienced.
+      if(/^\s*(?:skip to main content|home|search|menu)\b/i.test(t)) return false;
+      if(/^\s*[^.!?]{0,220}\?\s*$/i.test(t)) return false;
+      if(/\b(?:did|does|has|have|can|could|would|should)\s+(?:general|caregiver|family|training|therapy|anything|someone)\b/i.test(t) && !/\b(i|we|my|our|husband|wife|mother|father|mom|dad)\b/i.test(t)) return false;
       if(!words.some(w=>lower.includes(String(w).toLowerCase()))) return false;
-      return /\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|asked|experience|happened|couldn'?t|unable)\b/i.test(t);
+      return /\b(i|we|my|our|husband|wife|mother|father|mom|dad|patient|caregiver|tried|helped|worked|found|experience|happened|couldn'?t|unable)\b/i.test(t);
     };
 
     const focusEvidenceExcerpt = (excerpt, words) => {
@@ -162,17 +168,21 @@ export default async function handler(req, res) {
 
       const repeated = exp.length >= 2 && domains.length >= 2 && exp.every(communityRelevantToQuestion);
 
-      const displayTitle = !exp.length
-        ? title === "Caregivers describe freezing during transfers"
-          ? "Freezing can occur during transfers"
-          : title === "Using simple cues and slowing the movement"
-            ? "Cueing and slowing are described as possible strategies"
-            : title === "The chair and transfer setup may matter"
-              ? "Transfer setup may affect safety"
-              : title === "Avoiding rushing or pulling"
-                ? "Pacing and communication may matter during transfers"
-                : title
-        : title;
+      const displayTitle = repeated
+        ? title
+        : !exp.length
+          ? title === "Caregivers describe freezing during transfers"
+            ? "Freezing can occur during transfers"
+            : title === "Using simple cues and slowing the movement"
+              ? "Cueing and slowing are described as possible strategies"
+              : title === "The chair and transfer setup may matter"
+                ? "Transfer setup may affect safety"
+                : title === "Avoiding rushing or pulling"
+                  ? "Pacing and communication may matter during transfers"
+                  : title
+          : title === "Caregivers describe freezing during transfers"
+            ? "One firsthand report describes freezing during transfers"
+            : title;
 
       const evidenceLevel = repeated
         ? "repeated_independent"
