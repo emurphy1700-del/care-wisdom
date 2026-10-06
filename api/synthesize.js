@@ -25,6 +25,19 @@ export default async function handler(req, res) {
     const clinical = sources.filter(s => s && (s.type === "clinical" || s.type === "patient_org"));
     const guidance = sources.filter(s => s && s.type === "caregiver_guidance");
 
+    // Some providers classify caregiver-oriented articles differently depending
+    // on the result metadata. Normalize known caregiver-guidance sources here so
+    // they cannot disappear merely because the search classifier called them
+    // journalism or community.
+    const caregiverGuidance = sources.filter(s => {
+      if (!s) return false;
+      const h = (String(s.url || "") + " " + String(s.title || "")).toLowerCase();
+      return s.type === "caregiver_guidance" ||
+        /agingcare\\.com\\/articles\\//.test(h) ||
+        /aarp\\.org/.test(h) ||
+        /parkinson\\.org\\/resources-support\\/carepartners/.test(h);
+    });
+
     // Strategy questions need a different evidence standard from questions that
     // merely ask whether a symptom occurs. A firsthand report that describes a
     // problem is not evidence of a strategy unless it also describes something
@@ -142,7 +155,13 @@ export default async function handler(req, res) {
         (!strategyQuestion || hasStrategyEvidence(s))
       );
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
-      const guide = matching.filter(s => s.type === "caregiver_guidance");
+      const guide = matching.filter(s => {
+        const h=(String(s.url||"")+" "+String(s.title||"")).toLowerCase();
+        return s.type === "caregiver_guidance" ||
+          /agingcare\\.com\\/articles\\//.test(h) ||
+          /aarp\\.org/.test(h) ||
+          /parkinson\\.org\\/resources-support\\/carepartners/.test(h);
+      });
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
       const trail = matching.slice(0, 8).map(s => ({
@@ -463,7 +482,7 @@ export default async function handler(req, res) {
         reddit_sources: sources.filter(s => s && s.domain === "reddit.com").length,
         aarp_sources: sources.filter(s => s && s.domain === "aarp.org").length,
         public_sources: journalism.length,
-        caregiver_guidance_sources: guidance.length,
+        caregiver_guidance_sources: caregiverGuidance.length,
         domains
       }
     });
