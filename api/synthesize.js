@@ -36,8 +36,11 @@ export default async function handler(req, res) {
         source.title || "",
         ...(Array.isArray(source.excerpts) ? source.excerpts : [])
       ].join(" ").toLowerCase();
-      return /\b(i|we|my|our)\b.{0,180}\b(tried|try|used|use|started|stopped|changed|change|found|helped|worked|works|helps|cue|count|counted|music|rhythm|visual|verbal|march|rock|step|lean|position|moved|move|slowed|slow|waited|wait|focused|focus|looked|look|practiced|practice|trained|training)\b/i.test(text)
-        || /\b(tried|used|found|helped|worked|cueing|cue|counting|music|rhythm|visual cue|verbal cue|marching|rocking|slowing|positioning|foot placement|nose[- ]over[- ]toes)\b/i.test(text);
+      // Do not count generic movement/help language (e.g. "help him up" or
+      // "move") as a strategy. We need an actual intervention, cue, or change
+      // that the person tried/used/found helpful.
+      return /\b(i|we|my|our)\b.{0,220}\b(tried|used|started|stopped|changed|found|helped|worked|works|helps|practiced|trained|training)\b.{0,180}\b(cue|count|counted|music|rhythm|visual|verbal|march|rock|step|lean|position|slow|wait|focus|look|transfer|freezing|freeze|feet|chair|walking)\b/i.test(text)
+        || /\b(tried|used|found|helped|worked|cueing|counting|music|rhythm|visual cue|verbal cue|marching|rocking|slowing|positioning|foot placement|nose[- ]over[- ]toes)\b/i.test(text);
     };
 
     const communityRelevantToQuestion = (source) => {
