@@ -342,6 +342,19 @@ function buildQueries(q){
       "Parkinson's caregiver gets stuck recliner"
     );
   }
+  if(/freez/.test(lower) && /strateg|what helps|what worked|tips|cue|manage|deal with/.test(lower)){
+    queries.push(
+      "Parkinson's caregiver freezing what helps",
+      "Parkinson's caregiver freezing what worked",
+      "Parkinson's caregiver freezing strategies",
+      "Parkinson's freezing cueing caregiver experience",
+      "site:reddit.com/r/ParkinsonsCaregivers freezing what helps",
+      "site:reddit.com/r/ParkinsonsCaregivers freezing strategies",
+      "site:agingcare.com/questions Parkinson's freezing what helps caregiver",
+      "site:agingcare.com/questions Parkinson's freezing strategies caregiver",
+      "site:parkinson.org freezing cueing caregiver"
+    );
+  }
   if(/rehab|physical therapy|pt|nursing|snf|progress/.test(lower)){
     queries.push(
       "site:reddit.com/r/ParkinsonsCaregivers rehabilitation physical therapy experience",
@@ -359,6 +372,13 @@ function buildCommunityRecoveryQueries(q){
   out.push("Parkinson caregiver freezing transfers");
   out.push("Parkinson caregiver freezing chair what helped");
   out.push("Parkinson caregiver freezing sit to stand");
+  if(/freez/.test(lower) && /strateg|what helps|what worked|tips|cue|manage|deal with/.test(lower)){
+    out.push("Parkinson caregiver freezing what helped");
+    out.push("Parkinson caregiver freezing what worked");
+    out.push("site:reddit.com/r/ParkinsonsCaregivers freezing strategies");
+    out.push("site:reddit.com/r/ParkinsonsCaregivers freezing what helped");
+    out.push("site:agingcare.com/questions Parkinson's freezing what helped caregiver");
+  }
   if(/freez|stuck|chair|sit to stand|get(ting)? up|transfer/.test(lower)){
     out.push("site:reddit.com/r/ParkinsonsCaregivers Parkinson's freezing chair transfer what helped");
     out.push("site:reddit.com/r/Parkinsons freezing sit to stand caregiver");
