@@ -39,8 +39,14 @@ export default async function handler(req, res) {
       // Do not count generic movement/help language (e.g. "help him up" or
       // "move") as a strategy. We need an actual intervention, cue, or change
       // that the person tried/used/found helpful.
-      return /\b(i|we|my|our)\b.{0,220}\b(tried|used|started|stopped|changed|found|helped|worked|works|helps|practiced|trained|training)\b.{0,180}\b(cue|count|counted|music|rhythm|visual|verbal|march|rock|step|lean|position|slow|wait|focus|look|transfer|freezing|freeze|feet|chair|walking)\b/i.test(text)
-        || /\b(tried|used|found|helped|worked|cueing|counting|music|rhythm|visual cue|verbal cue|marching|rocking|slowing|positioning|foot placement|nose[- ]over[- ]toes)\b/i.test(text);
+      const strategyTerms = /\b(cue|cueing|count|counted|counting|music|rhythm|visual cue|visual|verbal cue|verbal|march|marching|rock|rocking|step|steps|lean|position|positioning|slow|slowing|wait|waiting|focus|focusing|look|looking|foot placement|nose[- ]over[- ]toes|laser|metronome)\b/i;
+      const actionTerms = /\b(tried|used|started|stopped|changed|practiced|trained|training|switched|began|found a way|learned to)\b/i;
+      const firstPerson = /\b(i|we|my|our|husband|wife|mother|father|mom|dad)\b/i;
+
+      // Require an explicit strategy/intervention, not merely an action that
+      // happened during caregiving ("helped him up", "moved him", etc.).
+      return (firstPerson.test(text) && actionTerms.test(text) && strategyTerms.test(text))
+        || (actionTerms.test(text) && strategyTerms.test(text));
     };
 
     const communityRelevantToQuestion = (source) => {
