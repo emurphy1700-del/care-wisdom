@@ -33,9 +33,9 @@ export default async function handler(req, res) {
       if (!s) return false;
       const h = (String(s.url || "") + " " + String(s.title || "")).toLowerCase();
       return s.type === "caregiver_guidance" ||
-        /agingcare\\.com\\/articles\\//.test(h) ||
+        /agingcare\.com\/articles\///.test(h) ||
         /aarp\\.org/.test(h) ||
-        /parkinson\\.org\\/resources-support\\/carepartners/.test(h);
+        /parkinson\.org\/resources-support\/carepartners/.test(h);
     });
 
     // Strategy questions need a different evidence standard from questions that
@@ -158,9 +158,9 @@ export default async function handler(req, res) {
       const guide = matching.filter(s => {
         const h=(String(s.url||"")+" "+String(s.title||"")).toLowerCase();
         return s.type === "caregiver_guidance" ||
-          /agingcare\\.com\\/articles\\//.test(h) ||
+          /agingcare\.com\/articles\///.test(h) ||
           /aarp\\.org/.test(h) ||
-          /parkinson\\.org\\/resources-support\\/carepartners/.test(h);
+          /parkinson\.org\/resources-support\/carepartners/.test(h);
       });
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
