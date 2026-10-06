@@ -527,6 +527,15 @@ function isQuestionRelevant(source, question, minHits=2){
 
     if(qHas(freezeGroup)) {
       if(!hasGroup(freezeGroup)) return false;
+
+      // Strategy/what-helps questions are intentionally allowed to pass on
+      // the defining problem alone. A firsthand account may describe what
+      // someone tried without using our preferred cueing/transfer vocabulary.
+      // The synthesis layer applies the stricter "actual strategy evidence"
+      // gate before calling anything a lived-experience pattern.
+      const strategyIntent = /what helps|what helped|what works|what worked|strateg|tips|how do .*manage|how do .*handle|how .*help|cueing|deal with/.test(q);
+      if(strategyIntent) return true;
+
       if(substantive.length===1) return true;
       const otherHits = substantive.filter(g => g !== freezeGroup && hasGroup(g)).length;
       return otherHits >= 1;
