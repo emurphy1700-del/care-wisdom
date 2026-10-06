@@ -43,11 +43,13 @@ function render(d){
      .filter(x=>!/(quick summary|sign in|create account|table of contents|home|topics|resources|search)/i.test(x))
      .filter(x=>x.toLowerCase()!==String(s.title||'').toLowerCase());
    const relevant=sentences.map(x=>({x,score:
-     (/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(x)?4:0)+
-     (/(help|use|try|focus|move|walk|practice|strategy|tip|technique)/i.test(x)?2:0)+
+     (/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(x)?5:0)+
+     (/(use|try|focus|practice|strategy|tip|technique|count|march|step|cue|shift|turn|pause|start)/i.test(x)?4:0)+
+     (/(help|move|walk)/i.test(x)?1:0)+
      (/(safe|safety|independence)/i.test(x)?1:0)}))
-     .filter(v=>v.score>=5)
+     .filter(v=>v.score>=9)
      .filter(v=>/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(v.x))
+     .filter(v=>/(use|try|focus|practice|strategy|tip|technique|count|march|step|cue|shift|turn|pause|start)/i.test(v.x))
      .sort((a,b)=>b.score-a.score)[0];
    return relevant?{s,excerpt:relevant.x}:null;
  }).filter(Boolean).slice(0,4);
