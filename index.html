@@ -33,14 +33,23 @@ function render(d){
  let html='';
  if(d.source_stats)html+=`<div class="source-breakdown"><span class="pill">${esc(d.source_stats.selected_lived_experience_sources||0)} lived-experience</span><span class="pill">${esc(d.source_stats.reddit_sources||0)} Reddit</span><span class="pill">${esc(d.source_stats.aarp_sources||0)} AARP</span><span class="pill">${esc(d.source_stats.public_sources||0)} public reporting</span>${d.source_stats.caregiver_guidance_sources?'<span class="pill">'+esc(d.source_stats.caregiver_guidance_sources)+' caregiver guidance</span>':''}<span class="pill">${esc(d.source_stats.independent_domains||0)} source domains</span></div>`; if(d.source_stats?.community_status){const cs=d.source_stats.community_status;const label=v=>v==="found"?"found":v==="no_results"?"no qualifying results":"unavailable";html+=`<div class="small muted" style="margin:8px 0 14px">Community retrieval: ${label(cs.community)} · Reddit: ${label(cs.reddit)}</div>`;}
  if(d.overview)html+=`<div class="mini" style="margin-bottom:18px"><b>Research overview</b>${esc(d.overview)}<div class="small muted" style="margin-top:8px">Source diversity is not the same as independent people. Care Wisdom only treats lived experience as recurring when it finds experiential reports across multiple domains.</div></div>`;
- const guidanceSources=(d.sources||[]).filter(s=>{
+ const guidanceSources=(d.sources||[]).map(s=>{
    const h=((s.url||'')+' '+(s.title||'')).toLowerCase();
    const isGuidance=s.type==='caregiver_guidance'||h.includes('agingcare.com/articles/')||h.includes('aarp.org')||h.includes('parkinson.org/resources-support/carepartners');
-   if(!isGuidance)return false;
-   const excerpts=Array.isArray(s.excerpts)?s.excerpts.join(' '):'';
-   return /(parkinson|freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|strategy|count|rhythm|visual|march|step)/i.test((h+' '+excerpts));
- }).slice(0,4);
- if(guidanceSources.length)html+=`<div class="evidence-note"><b>Caregiver guidance found</b><div>These sources offer caregiver-oriented strategies or guidance. They are presented separately from firsthand reports and are not evidence that an approach works for everyone.</div><div class="sources">${guidanceSources.map(s=>{const ex=(Array.isArray(s.excerpts)?s.excerpts:[]).find(x=>/(freez|cue|transfer|walking|mobility|strategy|count|rhythm|visual|march|step)/i.test(String(x)));return `<div class="source"><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title||s.url)}</a><div class="small muted">${esc(s.domain||'caregiver guidance')}</div>${ex?`<div style="margin-top:5px">${esc(String(ex).replace(/\\s+/g,' ').slice(0,420))}</div>`:''}</div>`}).join('')}</div></div>`;
+   if(!isGuidance)return null;
+   const raw=(Array.isArray(s.excerpts)?s.excerpts:[]).join(' ').replace(/\\s+/g,' ');
+   const sentences=raw.split(/(?<=[.!?])\\s+/).map(x=>x.trim())
+     .filter(x=>x.length>=45)
+     .filter(x=>!/(quick summary|sign in|create account|table of contents|home|topics|resources|search)/i.test(x))
+     .filter(x=>x.toLowerCase()!==String(s.title||'').toLowerCase());
+   const relevant=sentences.map(x=>({x,score:
+     (/(freez|cue|transfer|sit.?to.?stand|standing|walking|mobility|gait|rhythm|visual|march|step)/i.test(x)?4:0)+
+     (/(help|use|try|focus|move|walk|practice|strategy|tip|technique)/i.test(x)?2:0)+
+     (/(safe|safety|independence)/i.test(x)?1:0)}))
+     .filter(v=>v.score>=4).sort((a,b)=>b.score-a.score)[0];
+   return relevant?{s,excerpt:relevant.x}:null;
+ }).filter(Boolean).slice(0,4);
+ if(guidanceSources.length)html+=`<div class="evidence-note"><b>Caregiver guidance found</b><div>These sources offer caregiver-oriented strategies or guidance. They are presented separately from firsthand reports and are not evidence that an approach works for everyone.</div><div class="sources">${guidanceSources.map(({s,excerpt})=>`<div class="source"><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title||s.url)}</a><div class="small muted">${esc(s.domain||'caregiver guidance')}</div><div style="margin-top:5px">${esc(excerpt.slice(0,420))}</div></div>`).join('')}</div></div>`;
  const livedCount=d.source_stats?.lived_experience_sources||0;
  const hasLivedPattern=(d.patterns||[]).some(p=>p.category==='lived_experience'||p.category==='mixed');
  if(livedCount>0 && !hasLivedPattern)html+=`<div class="evidence-note"><b>Lived experiences found — but not enough to establish a pattern</b><div>${livedCount} firsthand/community source(s) were found that may be relevant to this question. They are not presented as a recurring pattern because the reports were not sufficiently consistent, numerous, or independently corroborated.</div><div class="small muted" style="margin-top:8px">Individual experiences can be useful for generating questions, but they are not evidence that an approach will work for everyone.</div></div>`;
