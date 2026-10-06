@@ -520,6 +520,7 @@ function isQuestionRelevant(source, question, minHits=2){
 
     if(qHas(freezeGroup)) {
       if(!hasGroup(freezeGroup)) return false;
+      if(substantive.length===1) return true;
       const otherHits = substantive.filter(g => g !== freezeGroup && hasGroup(g)).length;
       return otherHits >= 1;
     }
