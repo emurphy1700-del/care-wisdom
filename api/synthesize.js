@@ -24,6 +24,22 @@ export default async function handler(req, res) {
     const community = sources.filter(s => s && s.type === "community");
     const clinical = sources.filter(s => s && (s.type === "clinical" || s.type === "patient_org"));
 
+    // Strategy questions need a different evidence standard from questions that
+    // merely ask whether a symptom occurs. A firsthand report that describes a
+    // problem is not evidence of a strategy unless it also describes something
+    // the person tried, changed, used, or found helpful.
+    const strategyQuestion = /what helps|what helped|what works|what worked|strateg(y|ies)|tips|how (do|can) .*?(manage|handle|help)|manage|deal with|cue(s|ing)?/i.test(q);
+
+    const hasStrategyEvidence = (source) => {
+      if (!source || source.type !== "community") return false;
+      const text = [
+        source.title || "",
+        ...(Array.isArray(source.excerpts) ? source.excerpts : [])
+      ].join(" ").toLowerCase();
+      return /\b(i|we|my|our)\b.{0,180}\b(tried|try|used|use|started|stopped|changed|change|found|helped|worked|works|helps|cue|count|counted|music|rhythm|visual|verbal|march|rock|step|lean|position|moved|move|slowed|slow|waited|wait|focused|focus|looked|look|practiced|practice|trained|training)\b/i.test(text)
+        || /\b(tried|used|found|helped|worked|cueing|cue|counting|music|rhythm|visual cue|verbal cue|marching|rocking|slowing|positioning|foot placement|nose[- ]over[- ]toes)\b/i.test(text);
+    };
+
     const communityRelevantToQuestion = (source) => {
       if (!source || source.type !== "community") return false;
       const text = [
@@ -110,7 +126,11 @@ export default async function handler(req, res) {
         : sources.filter(s => s && (s.type === "community" ? communityRelevantToQuestion(s) && has(s, words) : has(s, words)));
       if (!matching.length) return;
 
-      const exp = matching.filter(s => s.type === "community" && communityRelevantToQuestion(s));
+      const exp = matching.filter(s =>
+        s.type === "community" &&
+        communityRelevantToQuestion(s) &&
+        (!strategyQuestion || hasStrategyEvidence(s))
+      );
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
@@ -124,7 +144,11 @@ export default async function handler(req, res) {
       }));
 
       const reportedSources = exp.filter(s =>
-        Array.isArray(s.excerpts) && s.excerpts.some(x => isCleanEvidenceExcerpt(x, words))
+        Array.isArray(s.excerpts) &&
+        s.excerpts.some(x =>
+          isCleanEvidenceExcerpt(x, words) &&
+          (!strategyQuestion || hasStrategyEvidence({...s, excerpts:[x]}))
+        )
       );
       const reportedDomains = [...new Set(reportedSources.map(s => s.domain).filter(Boolean))];
 
@@ -256,7 +280,9 @@ export default async function handler(req, res) {
         ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"],
         ["What transfer technique has PT/OT taught for this specific person?", "What should caregivers do when freezing occurs during a chair-to-bathroom transfer?", "Which parts of the transfer are actually unsafe or causing near-misses?"],
         ["Transfer training with PT/OT", "Chair-to-bathroom setup", "Freezing during sit-to-stand"],
-        s => (s.type === "community" ? communityRelevantToQuestion(s) : ((s.type === "clinical" || s.type === "patient_org") && has(s, ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"])))
+        s => (s.type === "community"
+          ? communityRelevantToQuestion(s) && (!strategyQuestion || hasStrategyEvidence(s))
+          : ((s.type === "clinical" || s.type === "patient_org") && has(s, ["freez", "freeze", "transfer", "chair", "bathroom", "getting", "stand", "mobility"])))
       );
       addPattern(
         "Using simple cues and slowing the movement",
@@ -287,7 +313,7 @@ export default async function handler(req, res) {
     const singleReports = sources
       .filter(s => {
         if(!s || s.type !== "community" || used.has(s.url)) return false;
-        if(communityRelevantToQuestion(s)) return true;
+        if(communityRelevantToQuestion(s) && (!strategyQuestion || hasStrategyEvidence(s))) return true;
         const excerpts = Array.isArray(s.excerpts) ? s.excerpts : [];
         const relevanceWords = /rehab|rehabilitation|physical therapy|\bpt\b|occupational therapy|\bot\b|progress|plateau|improv|stalled|goal|freez|frozen|stuck|chair|recliner|transfer|stand|get(ting)? up|blood pressure|orthostatic|hypotension|faint|dizz|lightheaded|toilet|toileting|bathroom|commode/;
         return excerpts.some(e =>
