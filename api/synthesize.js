@@ -123,7 +123,12 @@ export default async function handler(req, res) {
           : "clinical context"
       }));
 
-      const excerpts = exp
+      const reportedSources = exp.filter(s =>
+        Array.isArray(s.excerpts) && s.excerpts.some(x => isCleanEvidenceExcerpt(x, words))
+      );
+      const reportedDomains = [...new Set(reportedSources.map(s => s.domain).filter(Boolean))];
+
+      const excerpts = reportedSources
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts : [])
         .filter(x => isCleanEvidenceExcerpt(x, words))
         .slice(0, 4)
@@ -131,13 +136,8 @@ export default async function handler(req, res) {
         .filter(Boolean)
         .slice(0, 2);
 
-      const fallbackReports = exp
-        .filter(s => !excerpts.length || !Array.isArray(s.excerpts) || !s.excerpts.length)
-        .slice(0, 3)
-        .map(s => {
-          const title = String(s.title || "Caregiver discussion").trim();
-          return title + " — firsthand discussion relevant to this question.";
-        });
+      // Never turn a forum title/question into "what people reported".
+      // If no clean firsthand passage was extracted, say so explicitly.
 
       const clinicalExcerpts = clin
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts.map(x => ({
@@ -166,11 +166,11 @@ export default async function handler(req, res) {
         .filter(Boolean)
         .slice(0, 2);
 
-      const repeated = exp.length >= 2 && domains.length >= 2 && exp.every(communityRelevantToQuestion);
+      const repeated = reportedSources.length >= 2 && reportedDomains.length >= 2;
 
       const displayTitle = repeated
         ? title
-        : !exp.length
+        : !reportedSources.length
           ? title === "Caregivers describe freezing during transfers"
             ? "Freezing can occur during transfers"
             : title === "Using simple cues and slowing the movement"
@@ -186,11 +186,11 @@ export default async function handler(req, res) {
 
       const evidenceLevel = repeated
         ? "repeated_independent"
-        : (!exp.length && clin.length ? "strong_clinical_limited_lived" : "limited_support");
+        : (!reportedSources.length && clin.length ? "strong_clinical_limited_lived" : "limited_support");
 
       const evidenceLabel = repeated
         ? "Repeated across source domains"
-        : (!exp.length && clin.length ? "Clinical context; limited lived experience" : "Limited support");
+        : (!reportedSources.length && clin.length ? "Clinical context; limited lived experience" : "Limited support");
 
       const evidenceRationale = repeated
         ? "This appeared in firsthand sources from at least two source domains. That still does not establish independent people or prove the approach works for everyone."
@@ -200,7 +200,7 @@ export default async function handler(req, res) {
 
       patterns.push({
         title: displayTitle,
-        category: exp.length ? (clin.length ? "mixed" : "lived_experience") : "clinical_context",
+        category: reportedSources.length ? (clin.length ? "mixed" : "lived_experience") : "clinical_context",
         evidence_profile: {
           level: evidenceLevel,
           label: evidenceLabel,
@@ -208,11 +208,7 @@ export default async function handler(req, res) {
         },
         what_people_reported: excerpts.length
           ? excerpts.map(x => "“" + x + "”").join(" ")
-          : fallbackReports.length
-            ? fallbackReports.join(" ")
-            : exp.length
-              ? "A relevant firsthand source was found, but its extracted passage was too thin to safely summarize what was reported. This is not treated as a recurring pattern."
-              : "No qualifying firsthand report was found for this specific theme.",
+          : "No qualifying firsthand report was found for this specific theme.",
         evidence_check: clinicalExcerpts.length
           ? clinicalExcerpts.map(x => "“" + x + "”").join(" ")
           : clin.length
@@ -223,13 +219,13 @@ export default async function handler(req, res) {
           : exp.length
             ? "The reports point in a similar direction, but the available evidence does not establish how generalizable the experience is."
             : "This is clinical context rather than a recurring firsthand pattern.",
-        independence_note: exp.length ? "This pattern uses " + exp.length + " firsthand source(s) across " + domains.length + " domain(s). Source count is not a count of independent people." : "No firsthand source was strong enough to support this pattern.",
+        independence_note: reportedSources.length ? "This pattern uses " + reportedSources.length + " firsthand source(s) across " + reportedDomains.length + " domain(s). Source count is not a count of independent people." : "No firsthand source was strong enough to support this pattern.",
         care_team_questions: [{
           provider: q.includes("freez") ? "Physical Therapist" : "Appropriate care-team clinician",
           questions: questionList
         }],
         evidence_trail: trail,
-        why_this_surfaced: exp.length ? "The pattern was surfaced from firsthand/community sources plus any clinical context shown separately." : "The pattern was surfaced from clinical or public context; it is not presented as a recurring firsthand experience.",
+        why_this_surfaced: reportedSources.length ? "The pattern was surfaced from qualifying firsthand/community passages plus any clinical context shown separately." : "The pattern was surfaced from clinical or public context; it is not presented as a recurring firsthand experience.",
         rabbit_holes: rabbitHoles,
         source_titles: trail.map(x => x.title)
       });
