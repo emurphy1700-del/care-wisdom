@@ -282,14 +282,11 @@ export default async function handler(req, res) {
         what_people_reported: excerpts.length
           ? excerpts.map(x => "“" + x + "”").join(" ")
           : "No qualifying firsthand report was found for this specific theme.",
-        evidence_check: guidanceExcerpts.length || clinicalExcerpts.length
-          ? [
-              guidanceExcerpts.length ? "Caregiver guidance: " + guidanceExcerpts.map(x => "“" + x + "”").join(" ") : "",
-              clinicalExcerpts.length ? "Clinical context: " + clinicalExcerpts.map(x => "“" + x + "”").join(" ") : ""
-            ].filter(Boolean).join(" ")
-          : (guide.length || clin.length)
-            ? "Relevant guidance or clinical sources were found, but the extracted passages did not contain a clean, directly relevant evidence passage. Care Wisdom is not treating an article title or abstract label as evidence."
-            : "No qualifying guidance or clinical source in this evidence set directly addressed this theme.",
+        evidence_check: clinicalExcerpts.length
+          ? "Clinical context: " + clinicalExcerpts.map(x => "“" + x + "”").join(" ")
+          : clin.length
+            ? "Clinical sources address this theme, but the extracted passages did not contain a clean, directly relevant clinical passage."
+            : "No qualifying clinical source in this evidence set directly addressed this theme.",
         disagreement: exp.length && clin.length
           ? "The evidence comes from different kinds of sources and contexts. It does not establish that the same approach works for everyone."
           : exp.length
