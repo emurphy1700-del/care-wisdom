@@ -23,6 +23,7 @@ export default async function handler(req, res) {
 
     const community = sources.filter(s => s && s.type === "community");
     const clinical = sources.filter(s => s && (s.type === "clinical" || s.type === "patient_org"));
+    const guidance = sources.filter(s => s && s.type === "caregiver_guidance");
 
     // Strategy questions need a different evidence standard from questions that
     // merely ask whether a symptom occurs. A firsthand report that describes a
@@ -141,6 +142,7 @@ export default async function handler(req, res) {
         (!strategyQuestion || hasStrategyEvidence(s))
       );
       const clin = matching.filter(s => s.type === "clinical" || s.type === "patient_org");
+      const guide = matching.filter(s => s.type === "caregiver_guidance");
       const domains = [...new Set(exp.map(s => s.domain).filter(Boolean))];
 
       const trail = matching.slice(0, 8).map(s => ({
@@ -149,6 +151,7 @@ export default async function handler(req, res) {
         type: s.type || "other",
         role: s.type === "community" ? "firsthand/community record"
           : s.type === "journalism" ? "public reporting"
+          : s.type === "caregiver_guidance" ? "caregiver guidance"
           : "clinical context"
       }));
 
@@ -171,6 +174,24 @@ export default async function handler(req, res) {
 
       // Never turn a forum title/question into "what people reported".
       // If no clean firsthand passage was extracted, say so explicitly.
+
+      const guidanceExcerpts = guide
+        .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts.map(x => ({
+          sourceTitle: String(s.title || "").replace(/\s+/g, " ").trim(),
+          excerpt: String(x || "").replace(/\s+/g, " ").trim()
+        })) : [])
+        .flatMap(({sourceTitle, excerpt}) => excerpt.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length >= 55)
+          .filter(s => !/quick summary|sign in|create account|home|topics|resources|search|table of contents/i.test(s))
+          .map(s => ({sourceTitle, sentence:s})))
+        .filter(({sentence}) => {
+          const lower=sentence.toLowerCase();
+          const evidenceWords=Array.isArray(clinicalWords)&&clinicalWords.length?clinicalWords:words;
+          return evidenceWords.some(w=>lower.includes(String(w).toLowerCase())) &&
+            /(freez|cue|transfer|sit.?to.?stand|standing|gait|walking|mobility|fall|rehab|therapy|strategy|count|rhythm|visual|march|step)/i.test(lower);
+        })
+        .map(({sourceTitle,sentence}) => focusEvidenceExcerpt(sentence,words))
+        .filter(Boolean)
+        .slice(0,2);
 
       const clinicalExcerpts = clin
         .flatMap(s => Array.isArray(s.excerpts) ? s.excerpts.map(x => ({
@@ -242,11 +263,14 @@ export default async function handler(req, res) {
         what_people_reported: excerpts.length
           ? excerpts.map(x => "“" + x + "”").join(" ")
           : "No qualifying firsthand report was found for this specific theme.",
-        evidence_check: clinicalExcerpts.length
-          ? clinicalExcerpts.map(x => "“" + x + "”").join(" ")
-          : clin.length
-            ? "Clinical sources address this theme, but the extracted passages did not contain a clean, directly relevant evidence passage. Care Wisdom is not treating the article title or abstract label as evidence."
-            : "No qualifying clinical source in this evidence set directly addressed this theme.",
+        evidence_check: guidanceExcerpts.length || clinicalExcerpts.length
+          ? [
+              guidanceExcerpts.length ? "Caregiver guidance: " + guidanceExcerpts.map(x => "“" + x + "”").join(" ") : "",
+              clinicalExcerpts.length ? "Clinical context: " + clinicalExcerpts.map(x => "“" + x + "”").join(" ") : ""
+            ].filter(Boolean).join(" ")
+          : (guide.length || clin.length)
+            ? "Relevant guidance or clinical sources were found, but the extracted passages did not contain a clean, directly relevant evidence passage. Care Wisdom is not treating an article title or abstract label as evidence."
+            : "No qualifying guidance or clinical source in this evidence set directly addressed this theme.",
         disagreement: exp.length && clin.length
           ? "The evidence comes from different kinds of sources and contexts. It does not establish that the same approach works for everyone."
           : exp.length
@@ -439,6 +463,7 @@ export default async function handler(req, res) {
         reddit_sources: sources.filter(s => s && s.domain === "reddit.com").length,
         aarp_sources: sources.filter(s => s && s.domain === "aarp.org").length,
         public_sources: journalism.length,
+        caregiver_guidance_sources: guidance.length,
         domains
       }
     });
