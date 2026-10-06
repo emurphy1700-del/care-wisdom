@@ -36,7 +36,11 @@ export default async function handler(req,res){
 
     async function discoverRedditViaSearchPages(question){
   const lower=String(question||"").toLowerCase();
-  const q=/freez|stuck/.test(lower) ? "freezing transfers" : String(question||"").slice(0,180);
+  const q = /freez|stuck/.test(lower)
+    ? (/strateg|what helps|what worked|tips|cue|manage|deal with/.test(lower)
+      ? "freezing what helped caregiver strategies cueing"
+      : "freezing transfers")
+    : String(question||"").slice(0,180);
   const found=new Map();
 
   for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
