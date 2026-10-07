@@ -135,14 +135,14 @@ export default async function handler(req,res){
       providerSearch(
         "Return ONLY individual Reddit discussion pages from reddit.com relevant to this question. Prefer r/Parkinsons and r/ParkinsonsCaregivers. Look for people describing actual experiences with PT, rehabilitation, weakness, mobility, caregiving, falls, or stalled progress. Do not return subreddit landing pages or generic medical pages.",
         [
-          "site:reddit.com/r/Parkinsons "+q,
-          "site:reddit.com/r/ParkinsonsCaregivers "+q,
-          "site:reddit.com/r/Parkinsons freezing chair",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing chair",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing transfers",
-          "site:reddit.com/r/Parkinsons freezing transfers",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing sit to stand",
-          "site:reddit.com/r/Parkinsons stuck getting up"
+          "site:reddit.com/r/ParkinsonsCaregivers freezing what helps",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing strategies",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing cueing",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing counting",
+          "site:reddit.com/r/ParkinsonsCaregivers freezing music rhythm",
+          "site:reddit.com/r/Parkinsons freezing what helps",
+          "site:reddit.com/r/Parkinsons freezing strategies",
+          "site:reddit.com/r/Parkinsons freezing cueing"
         ],
         10,
         ["reddit.com"]
