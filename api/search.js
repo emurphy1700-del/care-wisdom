@@ -139,10 +139,14 @@ export default async function handler(req,res){
       providerSearch(
         "Return ONLY individual Reddit discussion pages from reddit.com relevant to this question. Prefer r/Parkinsons and r/ParkinsonsCaregivers. Look for people describing actual experiences with PT, rehabilitation, weakness, mobility, caregiving, falls, or stalled progress. Do not return subreddit landing pages or generic medical pages.",
         [
-          "site:reddit.com/r/ParkinsonsCaregivers freezing",
-          "site:reddit.com/r/Parkinsons freezing",
-          "site:reddit.com/r/ParkinsonsCaregivers stuck",
-          "site:reddit.com/r/Parkinsons stuck"
+          "Parkinson freezing Reddit",
+          "Parkinson caregiver freezing Reddit",
+          "Parkinson freezing what helps Reddit",
+          "Parkinson freezing strategies Reddit",
+          "Parkinson freezing cueing Reddit",
+          "Parkinson freezing stuck chair Reddit",
+          "Parkinson freezing transfers Reddit",
+          "Parkinson freezing counting music Reddit"
         ],
         10,
         ["reddit.com"]
