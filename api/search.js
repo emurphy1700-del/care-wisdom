@@ -356,6 +356,12 @@ function buildQueries(q){
       "Parkinson's freezing cueing caregiver experience",
       "site:reddit.com/r/ParkinsonsCaregivers freezing what helps",
       "site:reddit.com/r/ParkinsonsCaregivers freezing strategies",
+      "site:reddit.com/r/ParkinsonsCaregivers freezing cueing",
+      "site:reddit.com/r/ParkinsonsCaregivers freezing counting",
+      "site:reddit.com/r/ParkinsonsCaregivers freezing music rhythm",
+      "site:reddit.com/r/Parkinsons freezing what helps",
+      "site:reddit.com/r/Parkinsons freezing strategies",
+      "site:reddit.com/r/Parkinsons freezing cueing",
       "site:agingcare.com/questions Parkinson's freezing what helps caregiver",
       "site:agingcare.com/questions Parkinson's freezing strategies caregiver",
       "site:parkinson.org freezing cueing caregiver"
