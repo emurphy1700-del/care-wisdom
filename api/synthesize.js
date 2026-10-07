@@ -88,6 +88,16 @@ export default async function handler(req, res) {
 
       if (!groups.length) return true;
 
+      // For freezing "what helps/strategies" questions, a firsthand report
+      // does not need to mention a chair, transfer, or walking context if it
+      // clearly describes the freezing problem and an actual strategy tried.
+      // The stricter hasStrategyEvidence() check still prevents generic
+      // symptom mentions from being treated as lived-experience evidence.
+      if (/freez/.test(q) && strategyQuestion) {
+        return /freez|frozen|stuck|couldn.?t move|unable to move/.test(text)
+          && hasStrategyEvidence(source);
+      }
+
       // For a highly specific caregiving question, require evidence from at
       // least two substantive concepts when the source is a community report.
       // This prevents generic Parkinson's/caregiver pages from appearing as
