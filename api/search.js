@@ -36,11 +36,15 @@ export default async function handler(req,res){
 
     async function discoverRedditViaSearchPages(question){
   const lower=String(question||"").toLowerCase();
-  const q = /freez|stuck/.test(lower)
-    ? (/strateg|what helps|what worked|tips|cue|manage|deal with/.test(lower)
-      ? "freezing what helped caregiver strategies cueing"
-      : "freezing transfers")
-    : String(question||"").slice(0,180);
+  // Reddit's native search is much better at finding a broad topic than a
+  // long natural-language strategy query. Retrieve the individual freezing
+  // discussions first; the later relevance/strategy gates decide whether a
+  // thread actually contains useful evidence.
+  const q = /freez/.test(lower)
+    ? "freezing"
+    : /stuck/.test(lower)
+      ? "stuck Parkinson"
+      : String(question||"").slice(0,180);
   const found=new Map();
 
   for(const subreddit of ["ParkinsonsCaregivers","Parkinsons"]){
@@ -135,14 +139,10 @@ export default async function handler(req,res){
       providerSearch(
         "Return ONLY individual Reddit discussion pages from reddit.com relevant to this question. Prefer r/Parkinsons and r/ParkinsonsCaregivers. Look for people describing actual experiences with PT, rehabilitation, weakness, mobility, caregiving, falls, or stalled progress. Do not return subreddit landing pages or generic medical pages.",
         [
-          "site:reddit.com/r/ParkinsonsCaregivers freezing what helps",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing strategies",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing cueing",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing counting",
-          "site:reddit.com/r/ParkinsonsCaregivers freezing music rhythm",
-          "site:reddit.com/r/Parkinsons freezing what helps",
-          "site:reddit.com/r/Parkinsons freezing strategies",
-          "site:reddit.com/r/Parkinsons freezing cueing"
+          "site:reddit.com/r/ParkinsonsCaregivers freezing",
+          "site:reddit.com/r/Parkinsons freezing",
+          "site:reddit.com/r/ParkinsonsCaregivers stuck",
+          "site:reddit.com/r/Parkinsons stuck"
         ],
         10,
         ["reddit.com"]
